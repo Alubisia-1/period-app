@@ -36,6 +36,7 @@ dependencies:
   fl_chart: ^0.62.0  # For charts, since charts_flutter isn't available for Flutter
   shared_preferences: ^2.2.0
   google_mobile_ads: ^3.0.0
+  table_calendar: ^3.0.0
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
