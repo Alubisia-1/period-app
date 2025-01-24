@@ -24,6 +24,9 @@ class _PeriodTrackingScreenState extends State<PeriodTrackingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Use nullable provider and check if it's not null before using
+    final databaseService = Provider.of<DatabaseService?>(context, listen: false);
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Period Tracking'),
@@ -65,7 +68,7 @@ class _PeriodTrackingScreenState extends State<PeriodTrackingScreen> {
                 SizedBox(height: 20),
                 // Save Button
                 ElevatedButton(
-                  onPressed: _startDate != null && _flowIntensity != null
+                  onPressed: databaseService != null && _startDate != null && _flowIntensity != null
                       ? () async {
                           if (_startDate != null) {
                             final Cycle cycle = Cycle(
@@ -75,8 +78,8 @@ class _PeriodTrackingScreenState extends State<PeriodTrackingScreen> {
                               flowLevel: _flowIntensity!,
                             );
                             
-                            final db = Provider.of<DatabaseService>(context, listen: false);
-                            await db.insertCycle(cycle.toMap());
+                            // Here we check if databaseService is not null before calling insertCycle
+                            await databaseService.insertCycle(cycle.toMap());
                             
                             setState(() {
                               _startDate = null;

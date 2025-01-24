@@ -1,5 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:flutter/foundation.dart';
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
@@ -28,30 +30,57 @@ class DatabaseService {
 
   /// Initializes the database by creating it if it doesn't exist and setting up the schema.
   Future<Database> _initDB() async {
-    String path = join(await getDatabasesPath(), 'period_tracker.db');
-    return await openDatabase(
-      path,
-      version: 1,
-      onCreate: (Database db, int version) async {
-        try {
-          await db.execute(
-            "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, date_of_birth DATE, cycle_average INTEGER)",
-          );
-          await db.execute(
-            "CREATE TABLE cycles (id INTEGER PRIMARY KEY, start_date DATE, end_date DATE, user_id INTEGER, FOREIGN KEY (user_id) REFERENCES users(id))",
-          );
-          await db.execute(
-            "CREATE TABLE daily_logs (id INTEGER PRIMARY KEY, date DATE, temperature REAL, mood TEXT, flow_level TEXT, user_id INTEGER, FOREIGN KEY (user_id) REFERENCES users(id))",
-          );
-          await db.execute(
-            "CREATE TABLE symptoms (id INTEGER PRIMARY KEY, date DATE, symptom_name TEXT, severity INTEGER, user_id INTEGER, FOREIGN KEY (user_id) REFERENCES users(id))",
-          );
-        } catch (e) {
-          print('Error creating tables: $e');
-          throw Exception('Failed to create database schema: $e');
-        }
-      },
-    );
+    if (kIsWeb) {
+      // For web, use in-memory database
+      return await databaseFactory.openDatabase(inMemoryDatabasePath, options: OpenDatabaseOptions(
+        version: 1,
+        onCreate: (Database db, int version) async {
+          try {
+            await db.execute(
+              "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, date_of_birth DATE, cycle_average INTEGER)",
+            );
+            await db.execute(
+              "CREATE TABLE cycles (id INTEGER PRIMARY KEY, start_date DATE, end_date DATE, user_id INTEGER, FOREIGN KEY (user_id) REFERENCES users(id))",
+            );
+            await db.execute(
+              "CREATE TABLE daily_logs (id INTEGER PRIMARY KEY, date DATE, temperature REAL, mood TEXT, flow_level TEXT, user_id INTEGER, FOREIGN KEY (user_id) REFERENCES users(id))",
+            );
+            await db.execute(
+              "CREATE TABLE symptoms (id INTEGER PRIMARY KEY, date DATE, symptom_name TEXT, severity INTEGER, user_id INTEGER, FOREIGN KEY (user_id) REFERENCES users(id))",
+            );
+          } catch (e) {
+            print('Error creating tables: $e');
+            throw Exception('Failed to create database schema: $e');
+          }
+        },
+      ));
+    } else {
+      // For mobile, use file-based storage
+      String path = join(await getDatabasesPath(), 'period_tracker.db');
+      return await openDatabase(
+        path,
+        version: 1,
+        onCreate: (Database db, int version) async {
+          try {
+            await db.execute(
+              "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, date_of_birth DATE, cycle_average INTEGER)",
+            );
+            await db.execute(
+              "CREATE TABLE cycles (id INTEGER PRIMARY KEY, start_date DATE, end_date DATE, user_id INTEGER, FOREIGN KEY (user_id) REFERENCES users(id))",
+            );
+            await db.execute(
+              "CREATE TABLE daily_logs (id INTEGER PRIMARY KEY, date DATE, temperature REAL, mood TEXT, flow_level TEXT, user_id INTEGER, FOREIGN KEY (user_id) REFERENCES users(id))",
+            );
+            await db.execute(
+              "CREATE TABLE symptoms (id INTEGER PRIMARY KEY, date DATE, symptom_name TEXT, severity INTEGER, user_id INTEGER, FOREIGN KEY (user_id) REFERENCES users(id))",
+            );
+          } catch (e) {
+            print('Error creating tables: $e');
+            throw Exception('Failed to create database schema: $e');
+          }
+        },
+      );
+    }
   }
 
   /// Inserts a cycle into the cycles table. Uses REPLACE conflict algorithm to handle duplicates.
@@ -62,6 +91,17 @@ class DatabaseService {
     } catch (e) {
       print('Error inserting cycle: $e');
       throw Exception('Failed to insert cycle: $e');
+    }
+  }
+
+  /// Inserts a daily log into the daily_logs table. Uses REPLACE conflict algorithm to handle duplicates.
+  Future<void> insertDailyLog(Map<String, dynamic> log) async {
+    final db = await database;
+    try {
+      await db.insert('daily_logs', log, conflictAlgorithm: ConflictAlgorithm.replace);
+    } catch (e) {
+      print('Error inserting daily log: $e');
+      throw Exception('Failed to insert daily log: $e');
     }
   }
 
