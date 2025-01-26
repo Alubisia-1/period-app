@@ -207,37 +207,42 @@ class HomeScreen extends StatelessWidget {
         ),
       );
 
-  Widget _buildQuickLogSection(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Quick Log', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Roboto')),
-          SizedBox(height: 10),
-          _buildTemperatureLogButton(context),
-          SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildQuickLogButton(Icons.mood, 'Mood'),
-              _buildQuickLogButton(Icons.bloodtype, 'Flow'),
-            ],
-          ),
-          SizedBox(height: 10),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pushNamed(context, '/full_log');
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryColor,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+Widget _buildQuickLogSection(BuildContext context) => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Quick Log', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Roboto')),
+        SizedBox(height: 10),
+        _buildTemperatureLogButton(context),
+        SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween, // Spread items out
+          children: [
+            // Flow button on the far left with some padding
+            Padding(
+              padding: const EdgeInsets.only(left: 8.0), // Adjust this value for more or less spacing
+              child: _buildQuickLogButton(context, Icons.bloodtype, 'Flow'),
+            ),
+            // View Full Log button on the right without taking extra space
+            Align(
+              alignment: Alignment.centerRight,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pushNamed(context, '/full_log');
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                ),
+                child: Text('View Full Log'),
               ),
             ),
-            child: Text('View Full Log'),
-          ),
-        ],
-      );
-
+          ],
+        ),
+      ],
+    );
   Widget _buildTemperatureLogButton(BuildContext context) => Container(
         padding: EdgeInsets.all(16.0),
         decoration: BoxDecoration(
@@ -413,26 +418,81 @@ class HomeScreen extends StatelessWidget {
     });
   }
 
-  Widget _buildQuickLogButton(IconData icon, String label) => ElevatedButton(
-        onPressed: () {},
-        style: ElevatedButton.styleFrom(
-          backgroundColor: accentColor,
-          foregroundColor: Colors.black,
-          shape: CircleBorder(),
-          padding: EdgeInsets.all(15),
+  void _showFlowOptions(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15.0),
         ),
-        child: Column(
+        title: Text('Log Flow Intensity', style: TextStyle(fontFamily: 'Roboto')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 30),
-            SizedBox(height: 5),
-            Text(label, style: TextStyle(fontSize: 12, fontFamily: 'Roboto')),
+            ListTile(
+              leading: Icon(Icons.water_drop, color: Colors.lightBlue),
+              title: Text('Light', style: TextStyle(fontFamily: 'Roboto')),
+              onTap: () => _logFlow(context, 'Light'),
+            ),
+            ListTile(
+              leading: Icon(Icons.water_drop, color: Colors.blue),
+              title: Text('Medium', style: TextStyle(fontFamily: 'Roboto')),
+              onTap: () => _logFlow(context, 'Medium'),
+            ),
+            ListTile(
+              leading: Icon(Icons.water_drop, color: Colors.deepPurple),
+              title: Text('Heavy', style: TextStyle(fontFamily: 'Roboto')),
+              onTap: () => _logFlow(context, 'Heavy'),
+            ),
           ],
         ),
       );
+    },
+  );
+}
+void _logFlow(BuildContext context, String flowLevel) async {
+  final dbService = DatabaseService();
+  await dbService.insertDailyLog({
+    'flow_level': flowLevel,
+    'date': DateTime.now().toIso8601String(),
+    'user_id': 1, // Replace with actual user ID logic, e.g., from state management
+  });
 
-  Widget _buildSymptomColumn() => _buildColumnSection('Symptoms', ['Headache', 'Cramps', 'Nausea', 'Acne', 'Fatigue']);
+  if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Flow logged as $flowLevel')),
+    );
+    Navigator.pop(context); // Close the dialog after logging
+  }
+}
 
-  Widget _buildMoodColumn() => _buildColumnSection('Mood', ['Happy', 'Sad', 'Tired', 'Anxious', 'Neutral']);
+Widget _buildQuickLogButton(BuildContext context, IconData icon, String label) => ElevatedButton(
+      onPressed: () {
+        if (label == 'Flow') {
+          _showFlowOptions(context);
+        } else {
+          // If it's not Flow, handle other buttons here if needed
+        }
+      },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: accentColor,
+        foregroundColor: Colors.black,
+        shape: CircleBorder(),
+        padding: EdgeInsets.all(15),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 30),
+          SizedBox(height: 5),
+          Text(label, style: TextStyle(fontSize: 12, fontFamily: 'Roboto')),
+        ],
+      ),
+    );
+
+  Widget _buildSymptomColumn() => _buildColumnSection('Symptoms', ['Headache', 'Cramps', 'Nausea', 'Bloating']);
+
+  Widget _buildMoodColumn() => _buildColumnSection('Mood', ['Happy', 'Sad', 'Irritable', 'Anxious']);
 
   Widget _buildCycleHistoryCard() => _buildCard(
         icon: Icons.history,
