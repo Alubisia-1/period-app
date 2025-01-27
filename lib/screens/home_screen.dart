@@ -7,14 +7,17 @@ import './analytics_dashboard.dart';
 import 'package:bluetooth_thermal_printer/bluetooth_thermal_printer.dart';
 import '../services/backup_service.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
+  @override
+  _HomeScreenState createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
   final BackupService backupService = BackupService();
   
   // Define color scheme for consistency
   static const Color primaryColor = Color(0xFFE91E63); // Pink color
   static const Color accentColor = Color(0xFFF8BBD0); // Light pink
-
-  HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -490,10 +493,46 @@ Widget _buildQuickLogButton(BuildContext context, IconData icon, String label) =
       ),
     );
 
-  Widget _buildSymptomColumn() => _buildColumnSection('Symptoms', ['Headache', 'Cramps', 'Nausea', 'Bloating']);
+Widget _buildSymptomColumn() {
+  return _buildColumnSection('Symptoms', ['Headache', 'Cramps', 'Nausea', 'Bloating'], 
+      onItemTap: (item) => _logSymptom(context, item));
+}
 
-  Widget _buildMoodColumn() => _buildColumnSection('Mood', ['Happy', 'Sad', 'Irritable', 'Anxious']);
+void _logSymptom(BuildContext context, String symptom) async {
+  final dbService = DatabaseService();
+  await dbService.insertSymptom({
+    'date': DateTime.now().toIso8601String(),
+    'symptom_name': symptom,
+    'severity': 1, // Default severity, could be expanded to allow user input
+    'user_id': 1, // Replace with actual user ID logic
+  });
 
+  if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Logged $symptom')),
+    );
+  }
+}
+
+Widget _buildMoodColumn() {
+  return _buildColumnSection('Mood', ['Happy', 'Sad', 'Irritable', 'Anxious'], 
+      onItemTap: (item) => _logMood(context, item));
+}
+
+void _logMood(BuildContext context, String mood) async {
+  final dbService = DatabaseService();
+  await dbService.updateDailyLog({
+    'date': DateTime.now().toIso8601String(),
+    'mood': mood,
+    'user_id': 1, // Replace with actual user ID logic
+  });
+
+  if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Logged mood: $mood')),
+    );
+  }
+}
   Widget _buildCycleHistoryCard() => _buildCard(
         icon: Icons.history,
         title: 'Cycle History',
@@ -564,39 +603,38 @@ Widget _buildQuickLogButton(BuildContext context, IconData icon, String label) =
         ),
       );
 
-  Widget _buildColumnSection(String title, List<String> items) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Roboto')),
-          SizedBox(height: 10),
-          ...List.generate(
-            (items.length / 2).ceil(),
-            (index) => Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: items
-                  .sublist(index * 2, (index * 2) + 2 > items.length ? items.length : (index * 2) + 2)
-                  .map((item) => Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.all(4.0),
-                          child: ElevatedButton(
-                            onPressed: () {},
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: accentColor,
-                              foregroundColor: Colors.black,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            child: Text(item, style: TextStyle(fontFamily: 'Roboto')),
-                          ),
-                        ),
-                      ))
-                  .toList(),
-            ),
-          ),
-        ],
-      );
-
+Widget _buildColumnSection(String title, List<String> items, {Function(String)? onItemTap}) => Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Roboto')),
+    SizedBox(height: 10),
+    ...List.generate(
+      (items.length / 2).ceil(),
+      (index) => Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: items
+            .sublist(index * 2, (index * 2) + 2 > items.length ? items.length : (index * 2) + 2)
+            .map((item) => Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(4.0),
+                child: ElevatedButton(
+                  onPressed: onItemTap != null ? () => onItemTap(item) : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentColor,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Text(item, style: TextStyle(fontFamily: 'Roboto')),
+                ),
+              ),
+            ))
+            .toList(),
+      ),
+    ),
+  ],
+);
   Future<Widget> _buildCycleHistoryChart() async {
     int userId = 1; // Replace with actual user ID fetch logic
     final List<FlSpot> temperatureSpots = await fetchTemperatureDataForChart(userId);
