@@ -18,6 +18,10 @@ class _HomeScreenState extends State<HomeScreen> {
   // Define color scheme for consistency
   static const Color primaryColor = Color(0xFFE91E63); // Pink color
   static const Color accentColor = Color(0xFFF8BBD0); // Light pink
+  static const Color highlightedColor = Color(0xFFEC407A); 
+
+  String? _currentMood;
+  Set<String> _selectedSymptoms = {};
 
   @override
   Widget build(BuildContext context) {
@@ -495,24 +499,32 @@ Widget _buildQuickLogButton(BuildContext context, IconData icon, String label) =
 
 Widget _buildSymptomColumn() {
   return _buildColumnSection('Symptoms', ['Headache', 'Cramps', 'Nausea', 'Bloating'], 
-      onItemTap: (item) => _logSymptom(context, item));
+      onItemTap: (item) => _toggleSymptom(item));
 }
 
-void _logSymptom(BuildContext context, String symptom) async {
-  final dbService = DatabaseService();
-  await dbService.insertSymptom({
-    'date': DateTime.now().toIso8601String(),
-    'symptom_name': symptom,
-    'severity': 1, // Default severity, could be expanded to allow user input
-    'user_id': 1, // Replace with actual user ID logic
-  });
+  void _toggleSymptom(String symptom) async {
+    setState(() {
+      if (_selectedSymptoms.contains(symptom)) {
+        _selectedSymptoms.remove(symptom); // De-highlight if already selected
+      } else {
+        _selectedSymptoms.add(symptom); // Highlight if not selected
+      }
+    });
+    
+    final dbService = DatabaseService();
+    await dbService.insertSymptom({
+      'date': DateTime.now().toIso8601String(),
+      'symptom_name': symptom,
+      'severity': 1,
+      'user_id': 1,
+    });
 
-  if (context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Logged $symptom')),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_selectedSymptoms.contains(symptom) ? 'Logged $symptom' : 'Removed $symptom')),
+      );
+    }
   }
-}
 
 Widget _buildMoodColumn() {
   return _buildColumnSection('Mood', ['Happy', 'Sad', 'Irritable', 'Anxious'], 
@@ -520,6 +532,9 @@ Widget _buildMoodColumn() {
 }
 
 void _logMood(BuildContext context, String mood) async {
+  setState(() {
+    _currentMood = mood;
+  });
   final dbService = DatabaseService();
   await dbService.updateDailyLog({
     'date': DateTime.now().toIso8601String(),
@@ -603,38 +618,40 @@ void _logMood(BuildContext context, String mood) async {
         ),
       );
 
-Widget _buildColumnSection(String title, List<String> items, {Function(String)? onItemTap}) => Column(
-  crossAxisAlignment: CrossAxisAlignment.start,
-  children: [
-    Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Roboto')),
-    SizedBox(height: 10),
-    ...List.generate(
-      (items.length / 2).ceil(),
-      (index) => Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: items
-            .sublist(index * 2, (index * 2) + 2 > items.length ? items.length : (index * 2) + 2)
-            .map((item) => Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(4.0),
-                child: ElevatedButton(
-                  onPressed: onItemTap != null ? () => onItemTap(item) : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: accentColor,
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+  Widget _buildColumnSection(String title, List<String> items, {Function(String)? onItemTap}) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, fontFamily: 'Roboto')),
+      SizedBox(height: 10),
+      ...List.generate(
+        (items.length / 2).ceil(),
+        (index) => Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: items
+              .sublist(index * 2, (index * 2) + 2 > items.length ? items.length : (index * 2) + 2)
+              .map((item) => Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(4.0),
+                  child: ElevatedButton(
+                    onPressed: () => onItemTap?.call(item),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: title == 'Mood' 
+                        ? (_currentMood == item ? highlightedColor : accentColor)
+                        : (_selectedSymptoms.contains(item) ? highlightedColor : accentColor),
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
+                    child: Text(item, style: TextStyle(fontFamily: 'Roboto')),
                   ),
-                  child: Text(item, style: TextStyle(fontFamily: 'Roboto')),
                 ),
-              ),
-            ))
-            .toList(),
+              ))
+              .toList(),
+        ),
       ),
-    ),
-  ],
-);
+    ],
+  );
   Future<Widget> _buildCycleHistoryChart() async {
     int userId = 1; // Replace with actual user ID fetch logic
     final List<FlSpot> temperatureSpots = await fetchTemperatureDataForChart(userId);
