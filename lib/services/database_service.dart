@@ -61,6 +61,9 @@ class DatabaseService {
       await db.execute(
         "CREATE TABLE symptoms (id INTEGER PRIMARY KEY, date DATE, symptom_name TEXT, severity INTEGER, user_id INTEGER, FOREIGN KEY (user_id) REFERENCES users(id))",
       );
+      await db.execute(
+        "CREATE TABLE notifications (id INTEGER PRIMARY KEY, title TEXT, body TEXT, is_read INTEGER DEFAULT 0, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, user_id INTEGER, FOREIGN KEY (user_id) REFERENCES users(id))",
+      );
     } catch (e) {
       print('Error creating tables: $e');
       throw Exception('Failed to create database schema: $e');
@@ -129,5 +132,47 @@ class DatabaseService {
     }
   }
 
-  // Add more methods for CRUD operations as needed (e.g., delete, fetch, update others)
+  /// Inserts a notification into the notifications table.
+  Future<void> insertNotification(Map<String, dynamic> notificationData) async {
+    final db = await database;
+    try {
+      await db.insert('notifications', notificationData, conflictAlgorithm: ConflictAlgorithm.replace);
+    } catch (e) {
+      print('Error inserting notification: $e');
+      throw Exception('Failed to insert notification: $e');
+    }
+  }
+
+  /// Fetches all notifications for a specific user, ordered by timestamp.
+  Future<List<Map<String, dynamic>>> fetchNotifications(int userId) async {
+    final db = await database;
+    try {
+      return await db.query('notifications', where: 'user_id = ?', whereArgs: [userId], orderBy: 'timestamp DESC');
+    } catch (e) {
+      print('Error fetching notifications: $e');
+      throw Exception('Failed to fetch notifications: $e');
+    }
+  }
+
+  /// Deletes a notification from the database.
+  Future<void> deleteNotification(int notificationId) async {
+    final db = await database;
+    try {
+      await db.delete('notifications', where: 'id = ?', whereArgs: [notificationId]);
+    } catch (e) {
+      print('Error deleting notification: $e');
+      throw Exception('Failed to delete notification: $e');
+    }
+  }
+
+  /// Marks a notification as read by updating its status.
+  Future<void> markNotificationAsRead(int notificationId) async {
+    final db = await database;
+    try {
+      await db.update('notifications', {'is_read': 1}, where: 'id = ?', whereArgs: [notificationId]);
+    } catch (e) {
+      print('Error marking notification as read: $e');
+      throw Exception('Failed to mark notification as read: $e');
+    }
+  }
 }

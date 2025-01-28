@@ -5,6 +5,8 @@ import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz;
 import 'services/database_service.dart';
 import 'services/shared_preferences.dart';
 import 'screens/home_screen.dart';
@@ -16,7 +18,7 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterL
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize sqflite for appropriate platform
+  // Initialize sqflite
   if (kIsWeb) {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfiWeb;
@@ -25,17 +27,21 @@ void main() async {
     databaseFactory = databaseFactoryFfi;
   }
 
+  // Initialize TimeZone for scheduling notifications
+  tz.initializeTimeZones();
+
   // Initialize local notifications
-  if (!kIsWeb) { // Local notifications are not supported on web
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('app_icon'); // Replace 'app_icon' with your drawable resource
-    const InitializationSettings initializationSettings = InitializationSettings(
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
+  if (!kIsWeb) {
+    const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('app_icon');
+    final InitializationSettings initializationSettings = InitializationSettings(
       android: initializationSettingsAndroid,
     );
     await flutterLocalNotificationsPlugin.initialize(initializationSettings);
   }
 
-  // Initialize database or shared preferences based on the platform
+  // Initialize database or shared preferences
   DatabaseService? databaseService;
   SharedPreferencesService? sharedPreferencesService;
 

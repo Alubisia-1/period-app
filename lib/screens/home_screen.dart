@@ -6,6 +6,11 @@ import 'package:fl_chart/fl_chart.dart';
 import './analytics_dashboard.dart';
 import 'package:bluetooth_thermal_printer/bluetooth_thermal_printer.dart';
 import '../services/backup_service.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
+import './notifications_settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -42,13 +47,16 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: Icon(Icons.notifications, color: Colors.black),
-            onPressed: () {
-              // Handle notification action
-            },
-            tooltip: 'Notifications',
-          ),
+        IconButton(
+          icon: Icon(Icons.notifications, color: Colors.black),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => NotificationsSettingsScreen()),
+            );
+          },
+          tooltip: 'Notifications',
+        ),
           IconButton(
             icon: Icon(Icons.more_vert, color: Colors.black),
             onPressed: () {

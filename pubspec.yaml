@@ -40,7 +40,7 @@ dependencies:
   sqflite_common_ffi: ^2.3.0
   sqflite_common_ffi_web: ^0.4.0
   bluetooth_thermal_printer: ^0.0.6
-  flutter_local_notifications: ^9.9.0
+  flutter_local_notifications: ^9.9.1
   timezone: ^0.8.0
   path_provider: ^2.0.11
 

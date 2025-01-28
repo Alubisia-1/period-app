@@ -93,9 +93,9 @@ class _TrackSymptomMoodScreenState extends State<TrackSymptomMoodScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildSection('Symptoms', [...defaultSymptoms, ...customSymptoms], _toggleSymptom, onAdd: _addCustomSymptom, onRemove: _removeCustomSymptom),
+                _buildSection('Symptoms', [...defaultSymptoms, ...customSymptoms], _toggleSymptom, maxWidth, onAdd: _addCustomSymptom, onRemove: _removeCustomSymptom),
                 SizedBox(height: 20),
-                _buildSection('Mood', [...defaultMoods, ...customMoods], _selectMood, onAdd: _addCustomMood, onRemove: _removeCustomMood),
+                _buildSection('Mood', [...defaultMoods, ...customMoods], _selectMood, maxWidth, onAdd: _addCustomMood, onRemove: _removeCustomMood),
                 SizedBox(height: 20),
                 Center(
                   child: ElevatedButton(
@@ -124,7 +124,7 @@ class _TrackSymptomMoodScreenState extends State<TrackSymptomMoodScreen> {
     );
   }
 
-  Widget _buildSection(String title, List<String> items, Function(String) onItemTap, {Function(String)? onAdd, Function(String)? onRemove}) {
+  Widget _buildSection(String title, List<String> items, Function(String) onItemTap, double maxWidth, {Function(String)? onAdd, Function(String)? onRemove}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -174,51 +174,46 @@ class _TrackSymptomMoodScreenState extends State<TrackSymptomMoodScreen> {
           ],
         ),
         SizedBox(height: 10),
-        ...List.generate(
-          (items.length / 2).ceil(),
-          (index) => Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: items
-                .sublist(index * 2, (index * 2) + 2 > items.length ? items.length : (index * 2) + 2)
-                .map((item) => Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(4.0),
-                    child: ElevatedButton(
-                      onPressed: () => onItemTap(item),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: title == 'Mood' 
-                          ? (selectedMood == item ? Color(0xFFEC407A) : Colors.pink[100])
-                          : (selectedSymptoms.contains(item) ? Color(0xFFEC407A) : Colors.pink[100]),
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12), // Adjust padding to fit text and icon
-                      ),
-                      child: Stack(
-                        children: [
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(item, style: TextStyle(fontFamily: 'Roboto')),
-                          ),
-                          if (title == 'Symptoms' && customSymptoms.contains(item) || title == 'Mood' && customMoods.contains(item))
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: GestureDetector(
-                                onTap: () => onRemove?.call(item),
-                                child: Padding(
-                                  padding: const EdgeInsets.only(right: 8.0),
-                                  child: Icon(Icons.close, color: Colors.red, size: 16),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
+        Wrap(
+          spacing: 8.0, // space between items horizontally
+          runSpacing: 8.0, // space between items vertically
+          children: items.map((item) {
+            return SizedBox(
+              width: (maxWidth - 32) / 2, // Subtracting padding and spacing
+              child: ElevatedButton(
+                onPressed: () => onItemTap(item),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: title == 'Mood' 
+                    ? (selectedMood == item ? Color(0xFFEC407A) : Colors.pink[100])
+                    : (selectedSymptoms.contains(item) ? Color(0xFFEC407A) : Colors.pink[100]),
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                ))
-                .toList(),
-          ),
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+                child: Stack(
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(item, style: TextStyle(fontFamily: 'Roboto')),
+                    ),
+                    if (title == 'Symptoms' && customSymptoms.contains(item) || title == 'Mood' && customMoods.contains(item))
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: GestureDetector(
+                          onTap: () => onRemove?.call(item),
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: Icon(Icons.close, color: Colors.red, size: 16),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
         ),
       ],
     );
