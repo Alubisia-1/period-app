@@ -57,6 +57,13 @@ class _HomeScreenState extends State<HomeScreen> {
           },
           tooltip: 'Notifications',
         ),
+        IconButton(
+            icon: Icon(Icons.account_circle, color: Colors.black),
+            onPressed: () {
+              Navigator.pushNamed(context, '/registration');
+            },
+            tooltip: 'Account',
+          ),
           IconButton(
             icon: Icon(Icons.more_vert, color: Colors.black),
             onPressed: () {

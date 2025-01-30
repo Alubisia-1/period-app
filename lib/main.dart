@@ -16,6 +16,98 @@ import 'services/notification_service.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
+// AuthScreen implementation
+class AuthScreen extends StatefulWidget {
+  @override
+  _AuthScreenState createState() => _AuthScreenState();
+}
+
+class _AuthScreenState extends State<AuthScreen> {
+  bool _isLogin = true;
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _dobController = TextEditingController();
+
+  void _toggleAuthMode() {
+    setState(() {
+      _isLogin = !_isLogin;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_isLogin ? 'Login' : 'Register'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _nameController,
+                decoration: InputDecoration(labelText: 'Name'),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your name';
+                  }
+                  return null;
+                },
+              ),
+              if (!_isLogin)
+                TextFormField(
+                  controller: _dobController,
+                  decoration: InputDecoration(labelText: 'Date of Birth (e.g., DD/MM/YYYY)'),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your date of birth';
+                    }
+                    // You might want to add date validation here
+                    return null;
+                  },
+                ),
+              TextFormField(
+                controller: _passwordController,
+                decoration: InputDecoration(labelText: 'Password'),
+                obscureText: true,
+                validator: (value) {
+                  if (value == null || value.length < 6) {
+                    return 'Password must be at least 6 characters';
+                  }
+                  return null;
+                },
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  if (_formKey.currentState!.validate()) {
+                    // Handle login or registration
+                    if (_isLogin) {
+                      print('Login: Name: ${_nameController.text}, Password: ${_passwordController.text}');
+                      // Add login logic here
+                    } else {
+                      print('Register: Name: ${_nameController.text}, DoB: ${_dobController.text}, Password: ${_passwordController.text}');
+                      // Add registration logic here
+                    }
+                  }
+                },
+                child: Text(_isLogin ? 'Login' : 'Register'),
+              ),
+              TextButton(
+                onPressed: _toggleAuthMode,
+                child: Text(_isLogin ? 'Need an account? Register' : 'Already have an account? Login'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -32,15 +124,11 @@ void main() async {
   tz.initializeTimeZones();
 
   // Initialize local notifications
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-
-  if (!kIsWeb) {
-    const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('app_icon');
-    final InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-    );
-    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
-  }
+  const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('app_icon');
+  final InitializationSettings initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+  );
+  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
   // Initialize database or shared preferences
   DatabaseService? databaseService;
@@ -93,6 +181,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/period_tracking': (context) => PeriodTrackingScreen(),
         '/full_log': (context) => TrackSymptomMoodScreen(),
+        '/registration': (context) => AuthScreen(),
       },
     );
   }

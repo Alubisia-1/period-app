@@ -92,6 +92,16 @@ class DatabaseService {
     }
   }
 
+    Future<void> insertUser(Map<String, dynamic> userData) async {
+    final db = await database;
+    try {
+      await db.insert('users', userData, conflictAlgorithm: ConflictAlgorithm.replace);
+    } catch (e) {
+      print('Error inserting user: $e');
+      throw Exception('Failed to insert user: $e');
+    }
+  }
+
   /// Inserts a symptom into the symptoms table. Uses REPLACE conflict algorithm to handle duplicates.
   Future<void> insertSymptom(Map<String, dynamic> symptom) async {
     final db = await database;
