@@ -12,6 +12,7 @@ import 'services/shared_preferences.dart';
 import 'screens/home_screen.dart';
 import 'screens/period_tracking_screen.dart';
 import 'screens/TrackSymptomMoodScreen.dart';
+import 'services/notification_service.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
@@ -47,8 +48,21 @@ void main() async {
 
   if (kIsWeb) {
     sharedPreferencesService = await SharedPreferencesService.getInstance();
+    // For web, we'll use a dummy DatabaseService or handle notifications without it
+    databaseService = null;
   } else {
     databaseService = await DatabaseService.getInstance();
+  }
+
+  // Create NotificationService instance, handling the case where databaseService might be null
+  final NotificationService notificationService;
+  if (databaseService != null) {
+    notificationService = NotificationService(flutterLocalNotificationsPlugin, databaseService);
+  } else {
+    // Here, we need to decide how to handle the case when databaseService is null.
+    // One option is to create a version of NotificationService that doesn't require a DatabaseService.
+    // For simplicity, let's assume NotificationService can work without DatabaseService on web.
+    notificationService = NotificationService(flutterLocalNotificationsPlugin, null);
   }
 
   runApp(
@@ -57,6 +71,7 @@ void main() async {
         Provider<DatabaseService?>(create: (_) => databaseService),
         Provider<SharedPreferencesService?>(create: (_) => sharedPreferencesService),
         Provider<FlutterLocalNotificationsPlugin>(create: (_) => flutterLocalNotificationsPlugin),
+        Provider<NotificationService>(create: (_) => notificationService),
       ],
       child: MyApp(),
     ),

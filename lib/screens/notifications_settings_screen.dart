@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/timezone.dart' as tz;
+import '../services/notification_service.dart';
 
 class NotificationsSettingsScreen extends StatefulWidget {
   @override
@@ -16,7 +15,7 @@ class _NotificationsSettingsScreenState extends State<NotificationsSettingsScree
 
   @override
   Widget build(BuildContext context) {
-    final notificationService = Provider.of<FlutterLocalNotificationsPlugin>(context, listen: false);
+    final notificationService = Provider.of<NotificationService>(context, listen: false);
     
     // Get the screen width to adjust padding based on screen size
     double screenWidth = MediaQuery.of(context).size.width;
@@ -54,28 +53,49 @@ class _NotificationsSettingsScreenState extends State<NotificationsSettingsScree
                   });
                 }),
                 SizedBox(height: 20),
-                // Test Notification Button
-                ElevatedButton(
-                  onPressed: () async {
-                    await _showTestNotification(notificationService);
+                // Display Notifications Section
+                FutureBuilder<List<Map<String, dynamic>>>(
+                  future: notificationService.fetchNotifications(1), // Replace 1 with the actual user ID
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return Center(child: CircularProgressIndicator());
+                    } else if (snapshot.hasError) {
+                      return Center(child: Text('Error: ${snapshot.error}'));
+                    } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return Center(child: Text('No notifications yet.'));
+                    } else {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Recent Notifications', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          SizedBox(height: 10),
+                          ListView.builder(
+                            shrinkWrap: true,
+                            physics: NeverScrollableScrollPhysics(),
+                            itemCount: snapshot.data!.length,
+                            itemBuilder: (context, index) {
+                              var notification = snapshot.data![index];
+                              return ListTile(
+                                title: Text(notification['title'], style: TextStyle(fontWeight: notification['is_read'] == 0 ? FontWeight.bold : FontWeight.normal)),
+                                subtitle: Text(notification['body']),
+                                trailing: IconButton(
+                                  icon: Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () async {
+                                    await notificationService.deleteNotification(notification['id']);
+                                    setState(() {});
+                                  },
+                                ),
+                                onTap: () async {
+                                  await notificationService.markAsRead(notification['id']);
+                                  setState(() {});
+                                },
+                              );
+                            },
+                          ),
+                        ],
+                      );
+                    }
                   },
-                  child: Text('Test Notification'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-                SizedBox(height: 20),
-                // Schedule Notification Button
-                ElevatedButton(
-                  onPressed: () async {
-                    await _scheduleTestNotification(notificationService);
-                  },
-                  child: Text('Schedule Notification'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                  ),
                 ),
               ],
             ),
@@ -112,46 +132,6 @@ class _NotificationsSettingsScreenState extends State<NotificationsSettingsScree
           onTimeSelected(newTime);
         }
       },
-    );
-  }
-
-  Future<void> _showTestNotification(FlutterLocalNotificationsPlugin notificationService) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
-      'test_channel',
-      'Test Channel',
-      channelDescription: 'Channel for testing notifications',
-      importance: Importance.max,
-      priority: Priority.high,
-    );
-    const NotificationDetails platformChannelSpecifics = NotificationDetails(android: androidPlatformChannelSpecifics);
-
-    await notificationService.show(
-      3, // id
-      'Test Notification', // title
-      'This is a test notification to check if notifications are working.', // body
-      platformChannelSpecifics, // details
-      payload: 'test_notification', // payload
-    );
-  }
-
-  Future<void> _scheduleTestNotification(FlutterLocalNotificationsPlugin notificationService) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
-      'scheduled_test_channel',
-      'Scheduled Test Channel',
-      channelDescription: 'Channel for scheduled test notifications',
-      importance: Importance.max,
-      priority: Priority.high,
-    );
-    const NotificationDetails platformChannelSpecifics = NotificationDetails(android: androidPlatformChannelSpecifics);
-
-    await notificationService.zonedSchedule(
-      4, // id
-      'Scheduled Test', // title
-      'This is a scheduled test notification.', // body
-      tz.TZDateTime.now(tz.local).add(const Duration(minutes: 1)), // Scheduled time, 1 minute from now
-      platformChannelSpecifics, // details
-      androidAllowWhileIdle: true,
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
     );
   }
 }
