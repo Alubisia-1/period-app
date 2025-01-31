@@ -32,16 +32,18 @@ class DatabaseService {
     if (kIsWeb) {
       // For web, use in-memory database
       return await databaseFactory.openDatabase(inMemoryDatabasePath, options: OpenDatabaseOptions(
-        version: 1,
+        version: 2, // Version remains the same as we're not changing the schema structure significantly
         onCreate: _createTables,
+        onUpgrade: _onUpgrade,
       ));
     } else {
       // For mobile, use file-based storage
       String path = join(await getDatabasesPath(), 'period_tracker.db');
       return await openDatabase(
         path,
-        version: 1,
+        version: 2, // Version remains the same as we're not changing the schema structure significantly
         onCreate: _createTables,
+        onUpgrade: _onUpgrade,
       );
     }
   }
@@ -50,7 +52,7 @@ class DatabaseService {
   Future<void> _createTables(Database db, int version) async {
     try {
       await db.execute(
-        "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, date_of_birth DATE, cycle_average INTEGER)",
+        "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, date_of_birth DATE, cycle_average INTEGER, password TEXT)",
       );
       await db.execute(
         "CREATE TABLE cycles (id INTEGER PRIMARY KEY, start_date DATE, end_date DATE, user_id INTEGER, FOREIGN KEY (user_id) REFERENCES users(id))",
@@ -64,9 +66,17 @@ class DatabaseService {
       await db.execute(
         "CREATE TABLE notifications (id INTEGER PRIMARY KEY, title TEXT, body TEXT, is_read INTEGER DEFAULT 0, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, user_id INTEGER, FOREIGN KEY (user_id) REFERENCES users(id))",
       );
+      print('Tables created successfully');
     } catch (e) {
       print('Error creating tables: $e');
       throw Exception('Failed to create database schema: $e');
+    }
+  }
+
+  /// Handles database upgrades.
+  void _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute("ALTER TABLE users ADD COLUMN password TEXT");
     }
   }
 
@@ -92,7 +102,8 @@ class DatabaseService {
     }
   }
 
-    Future<void> insertUser(Map<String, dynamic> userData) async {
+  /// Inserts a user into the users table. Uses REPLACE conflict algorithm to handle duplicates.
+  Future<void> insertUser(Map<String, dynamic> userData) async {
     final db = await database;
     try {
       await db.insert('users', userData, conflictAlgorithm: ConflictAlgorithm.replace);

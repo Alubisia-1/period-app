@@ -11,6 +11,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import './notifications_settings_screen.dart';
+import '../models/user.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -58,10 +59,10 @@ class _HomeScreenState extends State<HomeScreen> {
           tooltip: 'Notifications',
         ),
         IconButton(
-            icon: Icon(Icons.account_circle, color: Colors.black),
-            onPressed: () {
-              Navigator.pushNamed(context, '/registration');
-            },
+          icon: Icon(Icons.account_circle, color: Colors.black),
+          onPressed: () {
+            _showAccountDialog(context);
+          },
             tooltip: 'Account',
           ),
           IconButton(
@@ -486,6 +487,152 @@ void _logFlow(BuildContext context, String flowLevel) async {
       SnackBar(content: Text('Flow logged as $flowLevel')),
     );
     Navigator.pop(context); // Close the dialog after logging
+  }
+}
+
+void _showAccountDialog(BuildContext context) {
+  bool isLogin = true;
+  final _passwordController = TextEditingController();
+  final _fullNameController = TextEditingController();
+
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text(isLogin ? 'Login' : 'Register', style: TextStyle(fontFamily: 'Roboto')),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                if (!isLogin) ...[
+                  TextField(
+                    controller: _fullNameController,
+                    decoration: InputDecoration(labelText: 'Full Name'),
+                  ),
+                ],
+                TextField(
+                  controller: _passwordController,
+                  decoration: InputDecoration(labelText: 'Password'),
+                  obscureText: true,
+                ),
+                SizedBox(height: 10),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      isLogin = !isLogin;
+                    });
+                  },
+                  child: Text(isLogin ? 'Switch to Register' : 'Switch to Login', style: TextStyle(fontFamily: 'Roboto')),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    if (isLogin) {
+                      _login(_passwordController.text);
+                    } else {
+                      _register(_passwordController.text, _fullNameController.text);
+                    }
+                  },
+                  child: Text(isLogin ? 'Login' : 'Register', style: TextStyle(fontFamily: 'Roboto')),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+void _login(String password) async {
+  final dbService = DatabaseService();
+  try {
+    // Await the database instance
+    final db = await dbService.database;
+    
+    // Now query the database
+    List<Map<String, dynamic>> result = await db.query(
+      'users',
+    );
+
+    if (result.isNotEmpty) {
+      User user = User(
+        id: result[0]['id'],
+        password: result[0]['password'],
+        fullName: result[0]['name'], // Assuming 'name' in your db is the full name
+      );
+
+      if (user.password == password) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Login successful! Welcome, ${user.fullName}')),
+          );
+          Navigator.of(context).pop(); // Close dialog
+          // TODO: Implement navigation to home screen or user dashboard
+        }
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Login failed. Incorrect password.')),
+          );
+        }
+      }
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Login failed. User not found.')),
+        );
+      }
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('An error occurred during login: $e')),
+      );
+    }
+  }
+}
+
+void _register(String password, String fullName) async {
+  final dbService = DatabaseService();
+  try {
+    // Await the database instance
+    final db = await dbService.database;
+    
+    // Check if user already exists, assuming all users share a common password or identifier
+    List<Map<String, dynamic>> existingUsers = await db.query(
+      'users',
+    );
+
+    if (existingUsers.isEmpty) {
+      await dbService.insertUser({
+        'password': password, // Note: In real apps, hash the password before storing
+        'name': fullName, // Assuming 'name' in your db is the full name
+        'date_of_birth': '1900-01-01', // Default, should be updated later
+        'cycle_average': 28, // Default cycle length
+      });
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Registration successful! You can now log in.')),
+        );
+        Navigator.of(context).pop(); // Close dialog
+      }
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Registration failed. User already exists.')),
+        );
+      }
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('An error occurred during registration: $e')),
+      );
+    }
   }
 }
 

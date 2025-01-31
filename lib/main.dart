@@ -181,7 +181,6 @@ class MyApp extends StatelessWidget {
       routes: {
         '/period_tracking': (context) => PeriodTrackingScreen(),
         '/full_log': (context) => TrackSymptomMoodScreen(),
-        '/registration': (context) => AuthScreen(),
       },
     );
   }
