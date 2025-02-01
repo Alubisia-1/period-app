@@ -12,6 +12,8 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import './notifications_settings_screen.dart';
 import '../models/user.dart';
+import 'package:provider/provider.dart';
+import 'package:period_tracker_app/providers/user_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -58,11 +60,16 @@ class _HomeScreenState extends State<HomeScreen> {
           },
           tooltip: 'Notifications',
         ),
-        IconButton(
-          icon: Icon(Icons.account_circle, color: Colors.black),
-          onPressed: () {
-            _showAccountDialog(context);
-          },
+          IconButton(
+            icon: Icon(Icons.account_circle, color: Colors.black),
+            onPressed: () {
+              final userProvider = Provider.of<UserProvider>(context, listen: false);
+              if (userProvider.isLoggedIn) {
+                _showUserProfile(context); // You need to implement this method
+              } else {
+                _showAccountDialog(context);
+              }
+            },
             tooltip: 'Account',
           ),
           IconButton(
@@ -505,12 +512,11 @@ void _showAccountDialog(BuildContext context) {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                if (!isLogin) ...[
-                  TextField(
-                    controller: _fullNameController,
-                    decoration: InputDecoration(labelText: 'Full Name'),
-                  ),
-                ],
+                // Show Full Name field for both login and register
+                TextField(
+                  controller: _fullNameController,
+                  decoration: InputDecoration(labelText: 'Full Name'),
+                ),
                 TextField(
                   controller: _passwordController,
                   decoration: InputDecoration(labelText: 'Password'),
@@ -528,7 +534,7 @@ void _showAccountDialog(BuildContext context) {
                 ElevatedButton(
                   onPressed: () {
                     if (isLogin) {
-                      _login(_passwordController.text);
+                      _login(_fullNameController.text, _passwordController.text);
                     } else {
                       _register(_passwordController.text, _fullNameController.text);
                     }
@@ -547,43 +553,40 @@ void _showAccountDialog(BuildContext context) {
     },
   );
 }
-void _login(String password) async {
+void _login(String fullName, String password) async {
   final dbService = DatabaseService();
+  final userProvider = Provider.of<UserProvider>(context, listen: false);
+
   try {
     // Await the database instance
     final db = await dbService.database;
     
-    // Now query the database
+    // Now query the database for a user with the given name and password
     List<Map<String, dynamic>> result = await db.query(
       'users',
+      where: 'name = ? AND password = ?',
+      whereArgs: [fullName, password],
     );
 
     if (result.isNotEmpty) {
       User user = User(
         id: result[0]['id'],
         password: result[0]['password'],
-        fullName: result[0]['name'], // Assuming 'name' in your db is the full name
+        fullName: result[0]['name'],
       );
 
-      if (user.password == password) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Login successful! Welcome, ${user.fullName}')),
-          );
-          Navigator.of(context).pop(); // Close dialog
-          // TODO: Implement navigation to home screen or user dashboard
-        }
-      } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Login failed. Incorrect password.')),
-          );
-        }
+      userProvider.login(user);  // Update the UserProvider with the logged-in user
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Login successful! Welcome, ${user.fullName}')),
+        );
+        Navigator.of(context).pop(); // Close dialog
+        // TODO: Implement navigation to home screen or user dashboard if needed
       }
     } else {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login failed. User not found.')),
+          SnackBar(content: Text('Login failed. Incorrect name or password.')),
         );
       }
     }
@@ -598,6 +601,8 @@ void _login(String password) async {
 
 void _register(String password, String fullName) async {
   final dbService = DatabaseService();
+  final userProvider = Provider.of<UserProvider>(context, listen: false);
+
   try {
     // Await the database instance
     final db = await dbService.database;
@@ -614,6 +619,16 @@ void _register(String password, String fullName) async {
         'date_of_birth': '1900-01-01', // Default, should be updated later
         'cycle_average': 28, // Default cycle length
       });
+
+      // Create a User object with the new user's data
+      User newUser = User(
+        id: 1, // Assuming this is the first or only user; adjust if needed
+        password: password,
+        fullName: fullName,
+      );
+
+      userProvider.login(newUser); // Log the new user in immediately after registration
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Registration successful! You can now log in.')),
@@ -634,6 +649,27 @@ void _register(String password, String fullName) async {
       );
     }
   }
+}
+void _showUserProfile(BuildContext context) {
+  final userProvider = Provider.of<UserProvider>(context, listen: false);
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: Text('Profile'),
+        content: Text('Welcome, ${userProvider.user?.fullName}'),
+        actions: <Widget>[
+          TextButton(
+            child: Text('Logout'),
+            onPressed: () {
+              userProvider.logout();
+              Navigator.of(context).pop(); // Close dialog
+            },
+          ),
+        ],
+      );
+    },
+  );
 }
 
 Widget _buildQuickLogButton(BuildContext context, IconData icon, String label) => ElevatedButton(

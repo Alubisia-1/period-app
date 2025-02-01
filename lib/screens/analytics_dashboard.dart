@@ -1,12 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/database_service.dart';
+import 'package:provider/provider.dart';
+import '../providers/user_provider.dart';
 
 class AnalyticsDashboard extends StatelessWidget {
   const AnalyticsDashboard({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+      final userProvider = Provider.of<UserProvider>(context);
+      final userId = userProvider.user?.id;
+
+        if (userId == null) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Analytics Dashboard', style: TextStyle(color: Colors.black)),
+        backgroundColor: Colors.pink[200],
+        elevation: 0,
+      ),
+      body: Center(
+        child: Text('Please log in to view your analytics.'),
+      ),
+    );
+  }
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -33,7 +50,7 @@ class AnalyticsDashboard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 FutureBuilder<Map<String, dynamic>>(
-                  future: fetchAnalyticsData(1), // Assuming user ID is 1 for simplicity
+                  future: fetchAnalyticsData(userId), // Assuming user ID is 1 for simplicity
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return CircularProgressIndicator();

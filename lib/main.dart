@@ -7,12 +7,13 @@ import 'package:sqflite/sqflite.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
-import 'services/database_service.dart';
-import 'services/shared_preferences.dart';
-import 'screens/home_screen.dart';
-import 'screens/period_tracking_screen.dart';
-import 'screens/TrackSymptomMoodScreen.dart';
-import 'services/notification_service.dart';
+import 'package:period_tracker_app/services/database_service.dart'; // Adjusted import
+import 'package:period_tracker_app/services/shared_preferences.dart'; // Adjusted import
+import 'package:period_tracker_app/screens/home_screen.dart'; // Adjusted import
+import 'package:period_tracker_app/screens/period_tracking_screen.dart'; // Adjusted import
+import 'package:period_tracker_app/screens/TrackSymptomMoodScreen.dart'; // Adjusted import
+import 'package:period_tracker_app/services/notification_service.dart'; // Adjusted import
+import 'package:period_tracker_app/providers/user_provider.dart'; // New import for UserProvider
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
@@ -86,11 +87,15 @@ class _AuthScreenState extends State<AuthScreen> {
                   if (_formKey.currentState!.validate()) {
                     // Handle login or registration
                     if (_isLogin) {
-                      print('Login: Name: ${_nameController.text}, Password: ${_passwordController.text}');
-                      // Add login logic here
+                      // Add login logic here, using UserProvider
+                      final userProvider = Provider.of<UserProvider>(context, listen: false);
+                      // Example usage:
+                      // userProvider.login(User(...));
                     } else {
-                      print('Register: Name: ${_nameController.text}, DoB: ${_dobController.text}, Password: ${_passwordController.text}');
-                      // Add registration logic here
+                      // Add registration logic here, using UserProvider
+                      final userProvider = Provider.of<UserProvider>(context, listen: false);
+                      // Example usage:
+                      // userProvider.login(newUserAfterRegistration);
                     }
                   }
                 },
@@ -136,20 +141,16 @@ void main() async {
 
   if (kIsWeb) {
     sharedPreferencesService = await SharedPreferencesService.getInstance();
-    // For web, we'll use a dummy DatabaseService or handle notifications without it
     databaseService = null;
   } else {
     databaseService = await DatabaseService.getInstance();
   }
 
-  // Create NotificationService instance, handling the case where databaseService might be null
+  // Create NotificationService instance
   final NotificationService notificationService;
   if (databaseService != null) {
     notificationService = NotificationService(flutterLocalNotificationsPlugin, databaseService);
   } else {
-    // Here, we need to decide how to handle the case when databaseService is null.
-    // One option is to create a version of NotificationService that doesn't require a DatabaseService.
-    // For simplicity, let's assume NotificationService can work without DatabaseService on web.
     notificationService = NotificationService(flutterLocalNotificationsPlugin, null);
   }
 
@@ -160,6 +161,7 @@ void main() async {
         Provider<SharedPreferencesService?>(create: (_) => sharedPreferencesService),
         Provider<FlutterLocalNotificationsPlugin>(create: (_) => flutterLocalNotificationsPlugin),
         Provider<NotificationService>(create: (_) => notificationService),
+        ChangeNotifierProvider(create: (_) => UserProvider()), // Add UserProvider here
       ],
       child: MyApp(),
     ),
