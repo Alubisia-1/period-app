@@ -7,13 +7,13 @@ import 'package:sqflite/sqflite.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
-import 'package:period_tracker_app/services/database_service.dart'; // Adjusted import
-import 'package:period_tracker_app/services/shared_preferences.dart'; // Adjusted import
-import 'package:period_tracker_app/screens/home_screen.dart'; // Adjusted import
-import 'package:period_tracker_app/screens/period_tracking_screen.dart'; // Adjusted import
-import 'package:period_tracker_app/screens/TrackSymptomMoodScreen.dart'; // Adjusted import
-import 'package:period_tracker_app/services/notification_service.dart'; // Adjusted import
-import 'package:period_tracker_app/providers/user_provider.dart'; // New import for UserProvider
+import 'package:period_tracker_app/services/database_service.dart';
+import 'package:period_tracker_app/services/shared_preferences.dart';
+import 'package:period_tracker_app/screens/home_screen.dart';
+import 'package:period_tracker_app/screens/period_tracking_screen.dart';
+import 'package:period_tracker_app/screens/TrackSymptomMoodScreen.dart';
+import 'package:period_tracker_app/services/notification_service.dart';
+import 'package:period_tracker_app/providers/user_provider.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
@@ -87,12 +87,10 @@ class _AuthScreenState extends State<AuthScreen> {
                   if (_formKey.currentState!.validate()) {
                     // Handle login or registration
                     if (_isLogin) {
-                      // Add login logic here, using UserProvider
                       final userProvider = Provider.of<UserProvider>(context, listen: false);
                       // Example usage:
                       // userProvider.login(User(...));
                     } else {
-                      // Add registration logic here, using UserProvider
                       final userProvider = Provider.of<UserProvider>(context, listen: false);
                       // Example usage:
                       // userProvider.login(newUserAfterRegistration);
@@ -116,7 +114,6 @@ class _AuthScreenState extends State<AuthScreen> {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize sqflite
   if (kIsWeb) {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfiWeb;
@@ -125,34 +122,31 @@ void main() async {
     databaseFactory = databaseFactoryFfi;
   }
 
-  // Initialize TimeZone for scheduling notifications
   tz.initializeTimeZones();
 
-  // Initialize local notifications
   const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('app_icon');
   final InitializationSettings initializationSettings = InitializationSettings(
     android: initializationSettingsAndroid,
   );
   await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
-  // Initialize database or shared preferences
   DatabaseService? databaseService;
   SharedPreferencesService? sharedPreferencesService;
 
   if (kIsWeb) {
     sharedPreferencesService = await SharedPreferencesService.getInstance();
-    databaseService = null;
+    // For web, we'll initialize the database service, but it will use in-memory database
+    databaseService = DatabaseService();
+    print("Web DatabaseService initialized: $databaseService");
   } else {
     databaseService = await DatabaseService.getInstance();
+    print("Mobile DatabaseService initialized: $databaseService");
   }
 
+  final userProvider = UserProvider(); // Create UserProvider instance
+
   // Create NotificationService instance
-  final NotificationService notificationService;
-  if (databaseService != null) {
-    notificationService = NotificationService(flutterLocalNotificationsPlugin, databaseService);
-  } else {
-    notificationService = NotificationService(flutterLocalNotificationsPlugin, null);
-  }
+  final NotificationService notificationService = NotificationService(flutterLocalNotificationsPlugin, databaseService, userProvider);
 
   runApp(
     MultiProvider(
@@ -161,7 +155,7 @@ void main() async {
         Provider<SharedPreferencesService?>(create: (_) => sharedPreferencesService),
         Provider<FlutterLocalNotificationsPlugin>(create: (_) => flutterLocalNotificationsPlugin),
         Provider<NotificationService>(create: (_) => notificationService),
-        ChangeNotifierProvider(create: (_) => UserProvider()), // Add UserProvider here
+        ChangeNotifierProvider(create: (_) => userProvider),
       ],
       child: MyApp(),
     ),

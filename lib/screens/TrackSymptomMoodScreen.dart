@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/database_service.dart';
+import '../providers/user_provider.dart';
 
 class TrackSymptomMoodScreen extends StatefulWidget {
   const TrackSymptomMoodScreen({super.key});
@@ -72,6 +75,7 @@ class _TrackSymptomMoodScreenState extends State<TrackSymptomMoodScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
     // Get the screen width
     double screenWidth = MediaQuery.of(context).size.width;
     // Define a maximum width, for example, 600
@@ -100,11 +104,7 @@ class _TrackSymptomMoodScreenState extends State<TrackSymptomMoodScreen> {
                 Center(
                   child: ElevatedButton(
                     onPressed: () {
-                      // Save or process the selected symptoms and mood
-                      print('Selected Symptoms: $selectedSymptoms');
-                      print('Selected Mood: $selectedMood');
-                      // Optionally, navigate back to the previous screen or show a confirmation message
-                      Navigator.pop(context);
+                      _saveData(userProvider);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.pink,
@@ -122,6 +122,40 @@ class _TrackSymptomMoodScreenState extends State<TrackSymptomMoodScreen> {
         ),
       ),
     );
+  }
+
+  void _saveData(UserProvider userProvider) async {
+    int? userId = userProvider.user?.id;
+
+    if (userId != null) {
+      final DatabaseService databaseService = Provider.of<DatabaseService>(context, listen: false);
+
+      // Save symptoms
+      for (var symptom in selectedSymptoms) {
+        await databaseService.insertSymptom({
+          'date': DateTime.now().toIso8601String(),
+          'symptom_name': symptom,
+          'severity': 1, // You might want to allow for different severity levels
+          'user_id': userId,
+        });
+      }
+
+      // Save mood in daily_log
+      await databaseService.updateDailyLog({
+        'date': DateTime.now().toIso8601String(),
+        'mood': selectedMood,
+        'user_id': userId,
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Data saved successfully')),
+      );
+      Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please log in to save data')),
+      );
+    }
   }
 
   Widget _buildSection(String title, List<String> items, Function(String) onItemTap, double maxWidth, {Function(String)? onAdd, Function(String)? onRemove}) {

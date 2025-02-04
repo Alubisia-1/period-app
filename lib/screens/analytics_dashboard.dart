@@ -9,21 +9,22 @@ class AnalyticsDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-      final userProvider = Provider.of<UserProvider>(context);
-      final userId = userProvider.user?.id;
+    final userProvider = Provider.of<UserProvider>(context);
+    final userId = userProvider.user?.id;
 
-        if (userId == null) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Analytics Dashboard', style: TextStyle(color: Colors.black)),
-        backgroundColor: Colors.pink[200],
-        elevation: 0,
-      ),
-      body: Center(
-        child: Text('Please log in to view your analytics.'),
-      ),
-    );
-  }
+    if (userId == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('Analytics Dashboard', style: TextStyle(color: Colors.black)),
+          backgroundColor: Colors.pink[200],
+          elevation: 0,
+        ),
+        body: Center(
+          child: Text('Please log in to view your analytics.'),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -50,7 +51,7 @@ class AnalyticsDashboard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 FutureBuilder<Map<String, dynamic>>(
-                  future: fetchAnalyticsData(userId), // Assuming user ID is 1 for simplicity
+                  future: fetchAnalyticsData(userId),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return CircularProgressIndicator();

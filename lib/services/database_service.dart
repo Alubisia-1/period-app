@@ -12,6 +12,10 @@ class DatabaseService {
 
   /// Singleton pattern to ensure only one instance of DatabaseService is created.
   static Future<DatabaseService> getInstance() async {
+    if (_instance._database == null) {
+      // Only initialize if it hasn't been done yet
+      await _instance._initDB();
+    }
     return _instance;
   }
 
@@ -31,21 +35,26 @@ class DatabaseService {
   Future<Database> _initDB() async {
     if (kIsWeb) {
       // For web, use in-memory database
-      return await databaseFactory.openDatabase(inMemoryDatabasePath, options: OpenDatabaseOptions(
-        version: 2, // Version remains the same as we're not changing the schema structure significantly
+      print("Initializing database for web...");
+      _database = await databaseFactory.openDatabase(inMemoryDatabasePath, options: OpenDatabaseOptions(
+        version: 2,
         onCreate: _createTables,
         onUpgrade: _onUpgrade,
       ));
+      print("Web database initialized: $_database");
     } else {
       // For mobile, use file-based storage
+      print("Initializing database for mobile...");
       String path = join(await getDatabasesPath(), 'period_tracker.db');
-      return await openDatabase(
+      _database = await openDatabase(
         path,
-        version: 2, // Version remains the same as we're not changing the schema structure significantly
+        version: 2,
         onCreate: _createTables,
         onUpgrade: _onUpgrade,
       );
+      print("Mobile database initialized: $_database");
     }
+    return _database!;
   }
 
   /// Creates all necessary tables for the application.

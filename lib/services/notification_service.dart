@@ -1,12 +1,15 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import '../services/database_service.dart';
+import '../models/user.dart'; // Assuming User model is defined here
+import '../providers/user_provider.dart'; // Assuming UserProvider is defined here
 
 class NotificationService {
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin;
-  final DatabaseService? _databaseService; // Make this nullable
+  final DatabaseService? _databaseService;
+  final UserProvider? _userProvider;
 
-  NotificationService(this._flutterLocalNotificationsPlugin, this._databaseService);
+  NotificationService(this._flutterLocalNotificationsPlugin, this._databaseService, this._userProvider);
 
   Future<void> initializeNotifications() async {
     const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('app_icon');
@@ -34,14 +37,17 @@ class NotificationService {
       payload: 'period_reminder',
     );
 
-    // Store the notification if _databaseService is not null
-    if (_databaseService != null) {
-      await _databaseService!.insertNotification({
-        'title': 'Period Reminder',
-        'body': 'Your next period is predicted to start soon. Prepare accordingly!',
-        'is_read': 0,
-        'user_id': 1, // Assuming user ID 1, replace with dynamic user ID
-      });
+    // Store the notification if _databaseService and _userProvider are not null
+    if (_databaseService != null && _userProvider != null) {
+      int? userId = _userProvider!.user?.id;
+      if (userId != null) {
+        await _databaseService!.insertNotification({
+          'title': 'Period Reminder',
+          'body': 'Your next period is predicted to start soon. Prepare accordingly!',
+          'is_read': 0,
+          'user_id': userId,
+        });
+      }
     }
   }
 
@@ -66,14 +72,17 @@ class NotificationService {
       matchDateTimeComponents: DateTimeComponents.time,
     );
 
-    // Store the notification if _databaseService is not null
-    if (_databaseService != null) {
-      await _databaseService!.insertNotification({
-        'title': 'Daily Logging',
-        'body': 'Don\'t forget to log your symptoms and mood today!',
-        'is_read': 0,
-        'user_id': 1, // Assuming user ID 1, replace with dynamic user ID
-      });
+    // Store the notification if _databaseService and _userProvider are not null
+    if (_databaseService != null && _userProvider != null) {
+      int? userId = _userProvider!.user?.id;
+      if (userId != null) {
+        await _databaseService!.insertNotification({
+          'title': 'Daily Logging',
+          'body': 'Don\'t forget to log your symptoms and mood today!',
+          'is_read': 0,
+          'user_id': userId,
+        });
+      }
     }
   }
 
@@ -99,20 +108,27 @@ class NotificationService {
       matchDateTimeComponents: DateTimeComponents.time,
     );
 
-    // Store the notification if _databaseService is not null
-    if (_databaseService != null) {
-      await _databaseService!.insertNotification({
-        'title': 'Temperature Reminder',
-        'body': 'Time to log your basal body temperature!',
-        'is_read': 0,
-        'user_id': 1, // Assuming user ID 1, replace with dynamic user ID
-      });
+    // Store the notification if _databaseService and _userProvider are not null
+    if (_databaseService != null && _userProvider != null) {
+      int? userId = _userProvider!.user?.id;
+      if (userId != null) {
+        await _databaseService!.insertNotification({
+          'title': 'Temperature Reminder',
+          'body': 'Time to log your basal body temperature!',
+          'is_read': 0,
+          'user_id': userId,
+        });
+      }
     }
   }
 
   Future<void> insertNotification(Map<String, dynamic> notificationData) async {
-    if (_databaseService != null) {
-      await _databaseService!.insertNotification(notificationData);
+    if (_databaseService != null && _userProvider != null) {
+      int? userId = _userProvider!.user?.id;
+      if (userId != null) {
+        notificationData['user_id'] = userId;
+        await _databaseService!.insertNotification(notificationData);
+      }
     }
   }
 

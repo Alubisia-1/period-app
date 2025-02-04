@@ -439,14 +439,17 @@ Widget _buildQuickLogSection(BuildContext context) => Column(
 
   bool isNumeric(String s) => double.tryParse(s) != null;
 
-  void saveTemperature(double temp) async {
-    final dbService = DatabaseService();
-    await dbService.insertDailyLog({
-      'temperature': temp,
-      'date': DateTime.now().toIso8601String(),
-      'user_id': 1, // Assuming user ID, replace with actual logic
-    });
-  }
+void saveTemperature(double temp) async {
+  final dbService = DatabaseService();
+  final userProvider = Provider.of<UserProvider>(context, listen: false);
+  int userId = userProvider.user?.id ?? 0; // Assuming a default or handling no user login
+
+  await dbService.insertDailyLog({
+    'temperature': temp,
+    'date': DateTime.now().toIso8601String(),
+    'user_id': userId,
+  });
+}
 
   void _showFlowOptions(BuildContext context) {
   showDialog(
@@ -483,10 +486,13 @@ Widget _buildQuickLogSection(BuildContext context) => Column(
 }
 void _logFlow(BuildContext context, String flowLevel) async {
   final dbService = DatabaseService();
+  final userProvider = Provider.of<UserProvider>(context, listen: false);
+  int userId = userProvider.user?.id ?? 0;
+
   await dbService.insertDailyLog({
     'flow_level': flowLevel,
     'date': DateTime.now().toIso8601String(),
-    'user_id': 1, // Replace with actual user ID logic, e.g., from state management
+    'user_id': userId,
   });
 
   if (context.mounted) {
@@ -558,10 +564,7 @@ void _login(String fullName, String password) async {
   final userProvider = Provider.of<UserProvider>(context, listen: false);
 
   try {
-    // Await the database instance
     final db = await dbService.database;
-    
-    // Now query the database for a user with the given name and password
     List<Map<String, dynamic>> result = await db.query(
       'users',
       where: 'name = ? AND password = ?',
@@ -604,25 +607,20 @@ void _register(String password, String fullName) async {
   final userProvider = Provider.of<UserProvider>(context, listen: false);
 
   try {
-    // Await the database instance
     final db = await dbService.database;
-    
-    // Check if user already exists, assuming all users share a common password or identifier
-    List<Map<String, dynamic>> existingUsers = await db.query(
-      'users',
-    );
+    List<Map<String, dynamic>> existingUsers = await db.query('users');
 
     if (existingUsers.isEmpty) {
       await dbService.insertUser({
-        'password': password, // Note: In real apps, hash the password before storing
-        'name': fullName, // Assuming 'name' in your db is the full name
-        'date_of_birth': '1900-01-01', // Default, should be updated later
-        'cycle_average': 28, // Default cycle length
+        'password': password,
+        'name': fullName,
+        'date_of_birth': '1900-01-01',
+        'cycle_average': 28,
       });
 
       // Create a User object with the new user's data
       User newUser = User(
-        id: 1, // Assuming this is the first or only user; adjust if needed
+        id: existingUsers.length + 1, // Assuming auto-increment, adjust if needed
         password: password,
         fullName: fullName,
       );
@@ -700,29 +698,32 @@ Widget _buildSymptomColumn() {
       onItemTap: (item) => _toggleSymptom(item));
 }
 
-  void _toggleSymptom(String symptom) async {
-    setState(() {
-      if (_selectedSymptoms.contains(symptom)) {
-        _selectedSymptoms.remove(symptom); // De-highlight if already selected
-      } else {
-        _selectedSymptoms.add(symptom); // Highlight if not selected
-      }
-    });
-    
-    final dbService = DatabaseService();
-    await dbService.insertSymptom({
-      'date': DateTime.now().toIso8601String(),
-      'symptom_name': symptom,
-      'severity': 1,
-      'user_id': 1,
-    });
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_selectedSymptoms.contains(symptom) ? 'Logged $symptom' : 'Removed $symptom')),
-      );
+void _toggleSymptom(String symptom) async {
+  setState(() {
+    if (_selectedSymptoms.contains(symptom)) {
+      _selectedSymptoms.remove(symptom);
+    } else {
+      _selectedSymptoms.add(symptom);
     }
+  });
+
+  final dbService = DatabaseService();
+  final userProvider = Provider.of<UserProvider>(context, listen: false);
+  int userId = userProvider.user?.id ?? 0;
+
+  await dbService.insertSymptom({
+    'date': DateTime.now().toIso8601String(),
+    'symptom_name': symptom,
+    'severity': 1,
+    'user_id': userId,
+  });
+
+  if (mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(_selectedSymptoms.contains(symptom) ? 'Logged $symptom' : 'Removed $symptom')),
+    );
   }
+}
 
 Widget _buildMoodColumn() {
   return _buildColumnSection('Mood', ['Happy', 'Sad', 'Irritable', 'Anxious'], 
@@ -734,10 +735,13 @@ void _logMood(BuildContext context, String mood) async {
     _currentMood = mood;
   });
   final dbService = DatabaseService();
+  final userProvider = Provider.of<UserProvider>(context, listen: false);
+  int userId = userProvider.user?.id ?? 0;
+
   await dbService.updateDailyLog({
     'date': DateTime.now().toIso8601String(),
     'mood': mood,
-    'user_id': 1, // Replace with actual user ID logic
+    'user_id': userId,
   });
 
   if (context.mounted) {
@@ -851,8 +855,9 @@ void _logMood(BuildContext context, String mood) async {
     ],
   );
   Future<Widget> _buildCycleHistoryChart() async {
-    int userId = 1; // Replace with actual user ID fetch logic
-    final List<FlSpot> temperatureSpots = await fetchTemperatureDataForChart(userId);
+  final userProvider = Provider.of<UserProvider>(context, listen: false);
+  int userId = userProvider.user?.id ?? 0;
+  final List<FlSpot> temperatureSpots = await fetchTemperatureDataForChart(userId);
 
     return AspectRatio(
       aspectRatio: 2.2,

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../services/database_service.dart';
 import '../models/cycle_model.dart';
+import '../providers/user_provider.dart'; // Make sure this import is correct based on your project structure
 
 class PeriodTrackingScreen extends StatefulWidget {
   const PeriodTrackingScreen({super.key});
@@ -24,8 +25,21 @@ class _PeriodTrackingScreenState extends State<PeriodTrackingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Use nullable provider and check if it's not null before using
-    final databaseService = Provider.of<DatabaseService?>(context, listen: false);
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final databaseService = Provider.of<DatabaseService>(context, listen: false);
+    int? userId = userProvider.user?.id;
+
+    if (userId == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('Period Tracking'),
+          backgroundColor: Colors.pink[200],
+        ),
+        body: Center(
+          child: Text('Please log in to track your periods.'),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -40,13 +54,10 @@ class _PeriodTrackingScreenState extends State<PeriodTrackingScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                // Button to Start Cycle
                 _buildCycleButton('Start Cycle', Icons.calendar_today, Colors.blue[300]!, _startCycle),
                 SizedBox(height: 10),
-                // Button to End Cycle
                 _buildCycleButton('End Cycle', Icons.stop_circle, Colors.green[300]!, _endCycle),
                 SizedBox(height: 10),
-                // Flow Intensity Dropdown
                 DropdownButtonFormField<String>(
                   value: _flowIntensity,
                   items: _flowIntensities.map<DropdownMenuItem<String>>((String value) {
@@ -66,19 +77,17 @@ class _PeriodTrackingScreenState extends State<PeriodTrackingScreen> {
                   ),
                 ),
                 SizedBox(height: 20),
-                // Save Button
                 ElevatedButton(
-                  onPressed: databaseService != null && _startDate != null && _flowIntensity != null
+                  onPressed: _startDate != null && _flowIntensity != null
                       ? () async {
                           if (_startDate != null) {
                             final Cycle cycle = Cycle(
                               startDate: _startDate!,
                               endDate: _endDate ?? _startDate!,
-                              userId: 1,
+                              userId: userId,
                               flowLevel: _flowIntensity!,
                             );
                             
-                            // Here we check if databaseService is not null before calling insertCycle
                             await databaseService.insertCycle(cycle.toMap());
                             
                             setState(() {
@@ -132,7 +141,6 @@ class _PeriodTrackingScreenState extends State<PeriodTrackingScreen> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: events.map((event) {
-                                // Safe access to color, assuming 'event' might not have 'color'
                                 final color = (event as Map<String, dynamic>)['color'] as Color?;
                                 if (color != null) {
                                   return Container(
