@@ -249,7 +249,7 @@ Widget _buildQuickLogSection(BuildContext context) => Column(
           children: [
             // Flow button on the far left with some padding
             Padding(
-              padding: const EdgeInsets.only(left: 8.0), // Adjust this value for more or less spacing
+              padding: const EdgeInsets.only(left: 4.0), // Adjust this value for more or less spacing
               child: _buildQuickLogButton(context, Icons.bloodtype, 'Flow'),
             ),
             // View Full Log button on the right without taking extra space
@@ -880,7 +880,7 @@ void _logMood(BuildContext context, String mood) async {
               sideTitles: SideTitles(
                 showTitles: true,
                 reservedSize: 30,
-                getTitlesWidget: (value, meta) => Text('Day ${value.toInt()}', style: TextStyle(fontFamily: 'Roboto')),
+                getTitlesWidget: (value, meta) => Text(value.toInt().toString(), style: TextStyle(fontFamily: 'Roboto')),
               ),
             ),
             leftTitles: AxisTitles(

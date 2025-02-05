@@ -35,16 +35,16 @@ class DatabaseService {
   Future<Database> _initDB() async {
     if (kIsWeb) {
       // For web, use in-memory database
-      print("Initializing database for web...");
+      //print("Initializing database for web...");
       _database = await databaseFactory.openDatabase(inMemoryDatabasePath, options: OpenDatabaseOptions(
         version: 2,
         onCreate: _createTables,
         onUpgrade: _onUpgrade,
       ));
-      print("Web database initialized: $_database");
+      //print("Web database initialized: $_database");
     } else {
       // For mobile, use file-based storage
-      print("Initializing database for mobile...");
+      //print("Initializing database for mobile...");
       String path = join(await getDatabasesPath(), 'period_tracker.db');
       _database = await openDatabase(
         path,
@@ -52,7 +52,7 @@ class DatabaseService {
         onCreate: _createTables,
         onUpgrade: _onUpgrade,
       );
-      print("Mobile database initialized: $_database");
+      //print("Mobile database initialized: $_database");
     }
     return _database!;
   }
