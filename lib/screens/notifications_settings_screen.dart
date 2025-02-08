@@ -4,14 +4,15 @@ import '../services/notification_service.dart';
 import '../providers/user_provider.dart';
 
 class NotificationsSettingsScreen extends StatefulWidget {
+  const NotificationsSettingsScreen({super.key});
+
   @override
-  _NotificationsSettingsScreenState createState() => _NotificationsSettingsScreenState();
+  NotificationsSettingsScreenState createState() => NotificationsSettingsScreenState();
 }
 
-class _NotificationsSettingsScreenState extends State<NotificationsSettingsScreen> {
+class NotificationsSettingsScreenState extends State<NotificationsSettingsScreen> {
   bool _periodReminderEnabled = true;
   bool _dailyLogReminderEnabled = true;
-  bool _temperatureReminderEnabled = true;
   TimeOfDay _temperatureReminderTime = TimeOfDay(hour: 7, minute: 0);
 
   @override

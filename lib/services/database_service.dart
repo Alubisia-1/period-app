@@ -4,13 +4,14 @@ import 'package:sqflite/sqflite.dart' as sqflite;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path/path.dart' as p;
 import 'dart:convert'; 
-import 'package:crypto/crypto.dart';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
 import 'package:pointycastle/key_derivators/api.dart' as pointycastle;
 import 'package:pointycastle/key_derivators/pbkdf2.dart' as pointycastle;
 import 'package:pointycastle/digests/sha256.dart' as pointycastle;
 import 'package:pointycastle/macs/hmac.dart' as pointycastle;
+import 'package:flutter_bcrypt/flutter_bcrypt.dart';
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
@@ -44,7 +45,7 @@ class DatabaseService {
   }
 
   /// Initializes the database by creating it if it doesn't exist and setting up the schema.
-  Future _initDB() async {
+  Future<Database> _initDB() async {
     String? password = await _storage.read(key: 'user_password'); // Assume this is the login password
     if (password == null) {
       _logger.severe('No password set for user');
@@ -52,8 +53,14 @@ class DatabaseService {
     }
 
     // PBKDF2 Key Derivation
-    final salt = utf8.encode('some_salt_value'); // Use a fixed salt or generate one per user
-    final iterations = 10000; // Higher number for production to slow down key derivation
+    final random = Random.secure();
+    final salt = Uint8List.fromList(List<int>.generate(16, (_) => random.nextInt(256)));
+   /*
+    final saltString = base64Encode(salt);
+    // Higher number for production to slow down key derivation
+    
+    */
+    final iterations = 100000; // Higher number for production to slow down key derivation
     final keyLength = 32; // 32 bytes = 256 bits for AES-256 in SQLCipher
 
     // Setup PBKDF2 with HMAC-SHA256
@@ -88,7 +95,7 @@ class DatabaseService {
   Future<void> _createTables(Database db, int version) async {
     try {
       await db.execute(
-        "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, date_of_birth DATE, cycle_average INTEGER, password TEXT)",
+        "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, date_of_birth DATE, cycle_average INTEGER, password_hash TEXT, salt TEXT)",
       );
       await db.execute(
         "CREATE TABLE cycles (id INTEGER PRIMARY KEY, start_date DATE, end_date DATE, user_id INTEGER, FOREIGN KEY (user_id) REFERENCES users(id))",
@@ -110,15 +117,16 @@ class DatabaseService {
   }
 
   /// Handles database upgrades.
-  void _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      try {
-        await db.execute("ALTER TABLE users ADD COLUMN password TEXT");
-      } catch (e, stackTrace) {
-        _logger.warning('Error upgrading database from $oldVersion to $newVersion', e, stackTrace);
-      }
+void _onUpgrade(Database db, int oldVersion, int newVersion) async {
+  if (oldVersion < 2) {
+    try {
+      await db.execute("ALTER TABLE users ADD COLUMN password_hash TEXT");
+      await db.execute("ALTER TABLE users ADD COLUMN salt TEXT");  // Add this line to include salt
+    } catch (e, stackTrace) {
+      _logger.warning('Error upgrading database from $oldVersion to $newVersion', e, stackTrace);
     }
   }
+}
 
   /// Inserts a cycle into the cycles table. Uses REPLACE conflict algorithm to handle duplicates.
   Future<void> insertCycle(Map<String, dynamic> cycle) async {
@@ -175,15 +183,25 @@ Future<void> updateDailyLog(Map<String, dynamic> log) async {
 }
 
   /// Inserts a user into the users table. Uses REPLACE conflict algorithm to handle duplicates.
-  Future<void> insertUser(Map<String, dynamic> userData) async {
-    final db = await database;
-    try {
-      await db.insert('users', userData, conflictAlgorithm: ConflictAlgorithm.replace);
-    } catch (e, stackTrace) {
-      _logger.warning('Failed to insert user', e, stackTrace);
-      throw Exception('Failed to insert user: $e');
-    }
+Future<void> insertUser(Map<String, dynamic> userData) async {
+  final salt = Uint8List.fromList(List<int>.generate(16, (_) => Random.secure().nextInt(256)));
+  final saltString = base64Encode(salt);
+
+   final hashedPassword = await FlutterBcrypt.hashPw(
+    password: userData['password'], 
+    salt: saltString  // Use saltString here
+  ); // Use the generated salt directly
+  userData['password_hash'] = hashedPassword;
+  userData['salt'] = saltString;
+  userData.remove('password'); // Remove the plain text password
+  final db = await database;
+  try {
+    await db.insert('users', userData, conflictAlgorithm: ConflictAlgorithm.replace);
+  } catch (e, stackTrace) {
+    _logger.warning('Failed to insert user', e, stackTrace);
+    throw Exception('Failed to insert user: $e');
   }
+}
 
   /// Inserts a symptom into the symptoms table. Uses REPLACE conflict algorithm to handle duplicates.
   Future<void> insertSymptom(Map<String, dynamic> symptom) async {
@@ -238,4 +256,18 @@ Future<void> updateDailyLog(Map<String, dynamic> log) async {
       throw Exception('Failed to mark notification as read: $e');
     }
   }
+Future<bool> verifyUserPassword(String userId, String providedPassword) async {
+  final db = await database;
+  final result = await db.query('users', where: 'id = ?', whereArgs: [userId]);
+  if (result.isNotEmpty) {
+    String? storedHash = result.first['password_hash'] as String?;
+    if (storedHash != null) {
+      return await FlutterBcrypt.verify(password: providedPassword, hash: storedHash);
+    } else {
+      _logger.warning('Password hash is null for user $userId');
+      return false;
+    }
+  }
+  return false;
+}
 }

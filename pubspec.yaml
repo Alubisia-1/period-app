@@ -49,6 +49,7 @@ dependencies:
   pointycastle: ^3.4.0
   logging: ^1.0.0
   path: ^1.8.0
+  flutter_bcrypt: ^1.0.8
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

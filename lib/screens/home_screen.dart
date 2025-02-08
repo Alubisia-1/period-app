@@ -7,20 +7,18 @@ import './analytics_dashboard.dart';
 import 'package:bluetooth_thermal_printer/bluetooth_thermal_printer.dart';
 import '../services/backup_service.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/data/latest.dart' as tz;
-import 'package:timezone/timezone.dart' as tz;
 import './notifications_settings_screen.dart';
 import '../models/user.dart';
-import 'package:provider/provider.dart';
 import 'package:period_tracker_app/providers/user_provider.dart';
 
 class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  HomeScreenState createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> {
   final BackupService backupService = BackupService();
   
   // Define color scheme for consistency
@@ -29,7 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
   static const Color highlightedColor = Color(0xFFEC407A); 
 
   String? _currentMood;
-  Set<String> _selectedSymptoms = {};
+  final Set _selectedSymptoms = {};
 
   @override
   Widget build(BuildContext context) {
@@ -121,39 +119,43 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _showBackupMenu(BuildContext context) async {
-    final RenderBox button = context.findRenderObject() as RenderBox;
-    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
-    final RelativeRect position = RelativeRect.fromRect(
-      Rect.fromPoints(
-        button.localToGlobal(button.size.topRight(Offset.zero), ancestor: overlay),
-        button.localToGlobal(button.size.bottomRight(Offset.zero), ancestor: overlay),
-      ),
-      Offset.zero & overlay.size,
-    );
+void _showBackupMenu(BuildContext context) async {
+  // Capture the necessary data before entering an async block
+  final RenderBox button = context.findRenderObject() as RenderBox;
+  final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+  final RelativeRect position = RelativeRect.fromRect(
+    Rect.fromPoints(
+      button.localToGlobal(button.size.topRight(Offset.zero), ancestor: overlay),
+      button.localToGlobal(button.size.bottomRight(Offset.zero), ancestor: overlay),
+    ),
+    Offset.zero & overlay.size,
+  );
 
-    await showMenu<String>(
-      context: context,
-      position: position,
-      items: [
-        PopupMenuItem<String>(
-          value: 'backup',
-          child: Text('Backup Data'),
-        ),
-        PopupMenuItem<String>(
-          value: 'restore',
-          child: Text('Restore Data'),
-        ),
-      ],
-      elevation: 8.0,
-    ).then((String? value) {
+  // Use the captured position without context inside the async block
+  await showMenu(
+    context: context,
+    position: position,
+    items: [
+      PopupMenuItem(
+        value: 'backup',
+        child: Text('Backup Data'),
+      ),
+      PopupMenuItem(
+        value: 'restore',
+        child: Text('Restore Data'),
+      ),
+    ],
+    elevation: 8.0,
+  ).then((String? value) {
+    if (context.mounted) {  // Check if context is still mounted
       if (value == 'backup') {
         _handleBackup(context);
       } else if (value == 'restore') {
         _handleRestore(context);
       }
-    });
-  }
+    }
+  });
+}
 
   void _handleBackup(BuildContext context) async {
     try {
@@ -273,84 +275,82 @@ Widget _buildQuickLogSection(BuildContext context) => Column(
         ),
       ],
     );
-  Widget _buildTemperatureLogButton(BuildContext context) => Container(
-        padding: EdgeInsets.all(16.0),
-        decoration: BoxDecoration(
-          color: Colors.pink[50],
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.3),
-              spreadRadius: 2,
-              blurRadius: 5,
-              offset: Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.thermostat, color: primaryColor, size: 24),
-                SizedBox(width: 8),
-                Text('Temperature', style: TextStyle(fontSize: 16, fontFamily: 'Roboto')),
-              ],
-            ),
-            ElevatedButton(
-              onPressed: () {
-                _showTemperatureOptions(context);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue[100],
-                foregroundColor: Colors.blue,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
+Widget _buildTemperatureLogButton(BuildContext context) => Container(
+      padding: EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Colors.pink[50],
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(red: 0.3, green: 0.3, blue: 0.3, alpha: 0.3 * 255), // Correct use of named arguments
+            spreadRadius: 2,
+            blurRadius: 5,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.thermostat, color: primaryColor, size: 24),
+              SizedBox(width: 8),
+              Text('Temperature', style: TextStyle(fontSize: 16, fontFamily: 'Roboto')),
+            ],
+          ),
+          ElevatedButton(
+            onPressed: () {
+              _showTemperatureOptions(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue[100],
+              foregroundColor: Colors.blue,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
               ),
-              child: Text('Log Now', style: TextStyle(fontSize: 14, fontFamily: 'Roboto')),
             ),
-          ],
-        ),
-      );
-
-  void _showTemperatureOptions(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15.0),
+            child: Text('Log Now', style: TextStyle(fontSize: 14, fontFamily: 'Roboto')),
           ),
-          content: Container(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: Icon(Icons.bluetooth),
-                  title: Text('Smart Thermometer'),
-                  onTap: () {
-                    _showTemperatureManualPairPrompt(context);
-                    if (context.mounted) Navigator.pop(context);
-                  },
-                ),
-                ListTile(
-                  leading: Icon(Icons.edit),
-                  title: Text('Manual Entry'),
-                  onTap: () {
-                    _showTemperaturePrompt(context);
-                    if (context.mounted) Navigator.pop(context);
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+        ],
+      ),
     );
-  }
-
+    void _showTemperatureOptions(BuildContext context) {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15.0),
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: Icon(Icons.bluetooth),
+                    title: Text('Smart Thermometer'),
+                    onTap: () {
+                      _showTemperatureManualPairPrompt(context);
+                      if (context.mounted) Navigator.pop(context);
+                    },
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.edit),
+                    title: Text('Manual Entry'),
+                    onTap: () {
+                      _showTemperaturePrompt(context);
+                      if (context.mounted) Navigator.pop(context);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
   void _showTemperatureManualPairPrompt(BuildContext context) {
     showDialog(
       context: context,
@@ -505,8 +505,8 @@ void _logFlow(BuildContext context, String flowLevel) async {
 
 void _showAccountDialog(BuildContext context) {
   bool isLogin = true;
-  final _passwordController = TextEditingController();
-  final _fullNameController = TextEditingController();
+  final passwordController = TextEditingController();
+  final fullNameController = TextEditingController();
 
   showDialog(
     context: context,
@@ -517,14 +517,14 @@ void _showAccountDialog(BuildContext context) {
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
+              children: [
                 // Show Full Name field for both login and register
                 TextField(
-                  controller: _fullNameController,
+                  controller: fullNameController,
                   decoration: InputDecoration(labelText: 'Full Name'),
                 ),
                 TextField(
-                  controller: _passwordController,
+                  controller: passwordController,
                   decoration: InputDecoration(labelText: 'Password'),
                   obscureText: true,
                 ),
@@ -540,16 +540,16 @@ void _showAccountDialog(BuildContext context) {
                 ElevatedButton(
                   onPressed: () {
                     if (isLogin) {
-                      _login(_fullNameController.text, _passwordController.text);
+                      _login(fullNameController.text, passwordController.text);
                     } else {
-                      _register(_passwordController.text, _fullNameController.text);
+                      _register(passwordController.text, fullNameController.text);
                     }
                   },
-                  child: Text(isLogin ? 'Login' : 'Register', style: TextStyle(fontFamily: 'Roboto')),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryColor,
                     foregroundColor: Colors.white,
                   ),
+                  child: Text(isLogin ? 'Login' : 'Register', style: TextStyle(fontFamily: 'Roboto')),
                 ),
               ],
             ),
@@ -584,7 +584,6 @@ void _login(String fullName, String password) async {
           SnackBar(content: Text('Login successful! Welcome, ${user.fullName}')),
         );
         Navigator.of(context).pop(); // Close dialog
-        // TODO: Implement navigation to home screen or user dashboard if needed
       }
     } else {
       if (context.mounted) {

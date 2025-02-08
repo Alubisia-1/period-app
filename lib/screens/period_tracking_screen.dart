@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../services/database_service.dart';
@@ -10,10 +9,10 @@ class PeriodTrackingScreen extends StatefulWidget {
   const PeriodTrackingScreen({super.key});
 
   @override
-  _PeriodTrackingScreenState createState() => _PeriodTrackingScreenState();
+  PeriodTrackingScreenState createState() => PeriodTrackingScreenState();
 }
 
-class _PeriodTrackingScreenState extends State<PeriodTrackingScreen> {
+class PeriodTrackingScreenState extends State<PeriodTrackingScreen> {
   DateTime? _startDate;
   DateTime? _endDate;
   String? _flowIntensity;
@@ -77,61 +76,42 @@ class _PeriodTrackingScreenState extends State<PeriodTrackingScreen> {
                   ),
                 ),
                 SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: _startDate != null && _flowIntensity != null
-                      ? () async {
-                          if (_startDate != null) {
-                            final Cycle cycle = Cycle(
-                              startDate: _startDate!,
-                              endDate: _endDate ?? _startDate!,
-                              userId: userId,
-                              flowLevel: _flowIntensity!,
-                            );
-                            
-                            await databaseService.insertCycle(cycle.toMap());
-                            
-                            setState(() {
-                              _startDate = null;
-                              _endDate = null;
-                              _flowIntensity = null;
-                              _events.clear();
-                            });
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Cycle logged successfully')),
-                            );
-                          }
-                        }
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.pink,
-                    padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                  ),
-                  child: Text('Save Cycle', style: TextStyle(fontSize: 16)),
-                ),
-                SizedBox(height: 20),
-                // Calendar View
-                SizedBox(
-                  width: double.infinity,
-                  child: TableCalendar(
-                    firstDay: DateTime.utc(2010, 10, 16),
-                    lastDay: DateTime.utc(2030, 3, 14),
-                    focusedDay: _focusedDay,
-                    calendarFormat: _calendarFormat,
-                    onFormatChanged: (format) {
-                      if (_calendarFormat != format) {
-                        setState(() {
-                          _calendarFormat = format;
-                        });
+              ElevatedButton(
+                onPressed: _startDate != null && _flowIntensity != null
+                    ? () {
+                        _saveCycle(databaseService, userId);
                       }
-                    },
-                    onDaySelected: (selectedDay, focusedDay) {
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.pink,
+                  padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+                child: Text('Save Cycle', style: TextStyle(fontSize: 16)),
+              ),
+              SizedBox(height: 20),
+              // Calendar View
+              SizedBox(
+                width: double.infinity,
+                child: TableCalendar(
+                  firstDay: DateTime.utc(2010, 10, 16),
+                  lastDay: DateTime.utc(2030, 3, 14),
+                  focusedDay: _focusedDay,
+                  calendarFormat: _calendarFormat,
+                  onFormatChanged: (format) {
+                    if (_calendarFormat != format) {
                       setState(() {
-                        _focusedDay = focusedDay;
+                        _calendarFormat = format;
                       });
-                    },
+                    }
+                  },
+                  onDaySelected: (selectedDay, focusedDay) {
+                    setState(() {
+                      _focusedDay = focusedDay;
+                    });
+                  },
                     eventLoader: _getEventsForDay,
                     calendarBuilders: CalendarBuilders(
                       markerBuilder: (context, date, events) {
@@ -244,7 +224,39 @@ class _PeriodTrackingScreenState extends State<PeriodTrackingScreen> {
       );
     }
   }
-
+  void _saveCycle(DatabaseService databaseService, int userId) {
+  if (_startDate != null && _flowIntensity != null) {
+    final Cycle cycle = Cycle(
+      startDate: _startDate!,
+      endDate: _endDate ?? _startDate!,
+      userId: userId,
+      flowLevel: _flowIntensity!,
+    );
+  
+    // Avoid using BuildContext directly in async functions by checking if mounted
+    if (mounted) {
+      databaseService.insertCycle(cycle.toMap()).then((value) {
+        if (mounted) {
+          setState(() {
+            _startDate = null;
+            _endDate = null;
+            _flowIntensity = null;
+            _events.clear();
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Cycle logged successfully')),
+          );
+        }
+      }).catchError((error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to save cycle: $error')),
+          );
+        }
+      });
+    }
+  }
+}
   List<Map<String, Color>> _getEventsForDay(DateTime day) {
     return _events[day] ?? [];
   }

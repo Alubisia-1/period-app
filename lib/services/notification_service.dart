@@ -1,7 +1,6 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import '../services/database_service.dart';
-import '../models/user.dart'; // Assuming User model is defined here
 import '../providers/user_provider.dart'; // Assuming UserProvider is defined here
 
 class NotificationService {
@@ -39,9 +38,9 @@ class NotificationService {
 
     // Store the notification if _databaseService and _userProvider are not null
     if (_databaseService != null && _userProvider != null) {
-      int? userId = _userProvider!.user?.id;
+      int? userId = _userProvider.user?.id;
       if (userId != null) {
-        await _databaseService!.insertNotification({
+        await _databaseService.insertNotification({
           'title': 'Period Reminder',
           'body': 'Your next period is predicted to start soon. Prepare accordingly!',
           'is_read': 0,
@@ -74,9 +73,9 @@ class NotificationService {
 
     // Store the notification if _databaseService and _userProvider are not null
     if (_databaseService != null && _userProvider != null) {
-      int? userId = _userProvider!.user?.id;
+      int? userId = _userProvider.user?.id;
       if (userId != null) {
-        await _databaseService!.insertNotification({
+        await _databaseService.insertNotification({
           'title': 'Daily Logging',
           'body': 'Don\'t forget to log your symptoms and mood today!',
           'is_read': 0,
@@ -110,9 +109,9 @@ class NotificationService {
 
     // Store the notification if _databaseService and _userProvider are not null
     if (_databaseService != null && _userProvider != null) {
-      int? userId = _userProvider!.user?.id;
+      int? userId = _userProvider.user?.id;
       if (userId != null) {
-        await _databaseService!.insertNotification({
+        await _databaseService.insertNotification({
           'title': 'Temperature Reminder',
           'body': 'Time to log your basal body temperature!',
           'is_read': 0,
@@ -124,30 +123,30 @@ class NotificationService {
 
   Future<void> insertNotification(Map<String, dynamic> notificationData) async {
     if (_databaseService != null && _userProvider != null) {
-      int? userId = _userProvider!.user?.id;
+      int? userId = _userProvider.user?.id;
       if (userId != null) {
         notificationData['user_id'] = userId;
-        await _databaseService!.insertNotification(notificationData);
+        await _databaseService.insertNotification(notificationData);
       }
     }
   }
 
   Future<List<Map<String, dynamic>>> fetchNotifications(int userId) async {
     if (_databaseService != null) {
-      return await _databaseService!.fetchNotifications(userId);
+      return await _databaseService.fetchNotifications(userId);
     }
     return []; // Return an empty list if _databaseService is null
   }
 
   Future<void> deleteNotification(int notificationId) async {
     if (_databaseService != null) {
-      await _databaseService!.deleteNotification(notificationId);
+      await _databaseService.deleteNotification(notificationId);
     }
   }
 
   Future<void> markAsRead(int notificationId) async {
     if (_databaseService != null) {
-      await _databaseService!.markNotificationAsRead(notificationId);
+      await _databaseService.markNotificationAsRead(notificationId);
     }
   }
 }

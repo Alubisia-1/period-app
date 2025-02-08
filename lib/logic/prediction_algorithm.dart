@@ -1,12 +1,7 @@
 // File: lib/logic/prediction_algorithm.dart
-
-import 'package:intl/intl.dart';
 import '../services/database_service.dart';
-import '../services/shared_preferences.dart';
-
 class PredictionAlgorithm {
   final DatabaseService _dbService = DatabaseService();
-  final SharedPreferencesService _sharedPrefService = SharedPreferencesService();
 
   /// Predicts the next period start date based on historical cycle data.
   /// 
