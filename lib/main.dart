@@ -13,14 +13,16 @@ import 'package:period_tracker_app/screens/TrackSymptomMoodScreen.dart';
 import 'package:period_tracker_app/services/notification_service.dart';
 import 'package:period_tracker_app/providers/user_provider.dart';
 import 'package:period_tracker_app/services/logging_service.dart';
-
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-setupLogging();
+  await MobileAds.instance.initialize();
+
+  setupLogging();
 
   if (kIsWeb) {
     sqfliteFfiInit();
@@ -32,7 +34,8 @@ setupLogging();
 
   tz.initializeTimeZones();
 
-  const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('app_icon');
+  // Use '@mipmap/ic_launcher' to reference the icon in the mipmap folder
+  const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
   final InitializationSettings initializationSettings = InitializationSettings(
     android: initializationSettingsAndroid,
   );

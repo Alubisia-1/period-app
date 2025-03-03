@@ -4,15 +4,19 @@ import '../logic/prediction_algorithm.dart';
 import '../services/database_service.dart';
 import 'package:fl_chart/fl_chart.dart';
 import './analytics_dashboard.dart';
-import 'package:bluetooth_thermal_printer/bluetooth_thermal_printer.dart';
+import 'package:bluetooth_print/bluetooth_print.dart';
+import 'package:bluetooth_print/bluetooth_print_model.dart';
 import '../services/backup_service.dart';
 import 'package:provider/provider.dart';
 import './notifications_settings_screen.dart';
 import '../models/user.dart';
 import 'package:period_tracker_app/providers/user_provider.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:logging/logging.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+  
 
   @override
   HomeScreenState createState() => HomeScreenState();
@@ -20,6 +24,7 @@ class HomeScreen extends StatefulWidget {
 
 class HomeScreenState extends State<HomeScreen> {
   final BackupService backupService = BackupService();
+  final _logger = Logger('HomeScreen');
   
   // Define color scheme for consistency
   static const Color primaryColor = Color(0xFFE91E63); // Pink color
@@ -28,6 +33,41 @@ class HomeScreenState extends State<HomeScreen> {
 
   String? _currentMood;
   final Set _selectedSymptoms = {};
+
+  late BannerAd _bannerAd;
+  bool _isBannerAdReady = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _createBannerAd();
+  }
+
+  void _createBannerAd() {
+    _bannerAd = BannerAd(
+      adUnitId: 'ca-app-pub-3940256099942544/6300978111',
+      size: AdSize.banner,
+      request: AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (ad) {
+          setState(() {
+            _isBannerAdReady = true;
+          });
+        },
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose();
+          _logger.warning('Banner ad failed to load: $error');
+        },
+      ),
+    );
+    _bannerAd.load();
+  }
+
+  @override
+  void dispose() {
+    _bannerAd.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -105,6 +145,14 @@ class HomeScreenState extends State<HomeScreen> {
                 _buildMoodColumn(),
                 SizedBox(height: 20),
                 _buildCycleHistoryCard(),
+                if (_isBannerAdReady)
+                  Container(
+                    width: _bannerAd.size.width.toDouble(),
+                    height: _bannerAd.size.height.toDouble(),
+                    alignment: Alignment.bottomCenter,
+                    margin: EdgeInsets.only(top: 20),
+                    child: AdWidget(ad: _bannerAd),
+                ),
               ],
             ),
           ),
@@ -351,46 +399,71 @@ Widget _buildTemperatureLogButton(BuildContext context) => Container(
         },
       );
     }
-  void _showTemperatureManualPairPrompt(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Connect Thermometer'),
-        content: Text('Ensure your thermometer is paired via your device\'s Bluetooth settings. Look for devices like "Smart Thermometer" or similar.'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              if (context.mounted) Navigator.pop(context);
-            },
-            child: Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              _connectToThermometer(context);
-            },
-            child: Text('Proceed'),
-          ),
-        ],
-      ),
-    );
-  }
-
+    void _showTemperatureManualPairPrompt(BuildContext context) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Connect Printer'),
+          content: Text('Ensure your Bluetooth printer is paired via your device\'s Bluetooth settings.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => _connectToThermometer(context),
+              child: Text('Proceed'),
+            ),
+          ],
+        ),
+      );
+    }
   void _connectToThermometer(BuildContext context) async {
-    String deviceAddress = "00:11:22:33:44:55"; // Replace with actual device address
-    String? connectionResult = await BluetoothThermalPrinter.connect(deviceAddress);
-    
-    if (connectionResult == null) {
+    BluetoothPrint bluetoothPrint = BluetoothPrint.instance;
+    String deviceAddress = "00:11:22:33:44:55"; // Your printer's address (optional)
+
+    try {
+      bool isConnected = await bluetoothPrint.isConnected ?? false;
+      if (!isConnected) {
+        await bluetoothPrint.startScan(timeout: Duration(seconds: 4));
+        List<BluetoothDevice> devices = await bluetoothPrint.scanResults.first;
+
+        if (devices.isEmpty) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('No Bluetooth devices found.')),
+            );
+          }
+          return;
+        }
+        BluetoothDevice? targetDevice = devices.firstWhere(
+          (device) => device.address == deviceAddress,
+          orElse: () => devices.first, // Fallback to first device if address not found
+        );
+        await bluetoothPrint.connect(targetDevice);
+      }
+      if (await bluetoothPrint.isConnected == true) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Connected to printer.')),
+          );
+        }
+        List<LineText> testPrint = [
+          LineText(type: LineText.TYPE_TEXT, content: "Test Print\n", align: LineText.ALIGN_CENTER),
+          LineText(type: LineText.TYPE_TEXT, content: "Period Tracker App\n"),
+        ];
+        await bluetoothPrint.printReceipt({}, testPrint);
+      } else {
+        throw Exception('Connection failed');
+      }
+    } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Connected to thermometer.'))
+          SnackBar(content: Text('Failed to connect to printer: $e')),
         );
       }
-    } else {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to connect to thermometer. Error: $connectionResult'))
-        );
-      }
+    } finally {
+      await bluetoothPrint.stopScan(); // Clean up
     }
   }
 

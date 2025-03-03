@@ -1,7 +1,7 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import '../services/database_service.dart';
-import '../providers/user_provider.dart'; // Assuming UserProvider is defined here
+import '../providers/user_provider.dart'; 
 
 class NotificationService {
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin;
@@ -50,26 +50,26 @@ class NotificationService {
     }
   }
 
-  Future<void> scheduleDailyLoggingReminder() async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
-      'daily_log_channel',
-      'Daily Logging',
-      channelDescription: 'Remind you to log your daily symptoms and mood',
-      importance: Importance.defaultImportance,
-      priority: Priority.defaultPriority,
-    );
-    const NotificationDetails platformChannelSpecifics = NotificationDetails(android: androidPlatformChannelSpecifics);
+Future<void> scheduleDailyLoggingReminder() async {
+  const AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
+    'daily_log_channel',
+    'Daily Logging',
+    channelDescription: 'Remind you to log your daily symptoms and mood',
+    importance: Importance.defaultImportance,
+    priority: Priority.defaultPriority,
+  );
+  const NotificationDetails platformChannelSpecifics = NotificationDetails(android: androidPlatformChannelSpecifics);
 
-    await _flutterLocalNotificationsPlugin.zonedSchedule(
-      1,
-      'Daily Logging',
-      'Don\'t forget to log your symptoms and mood today!',
-      tz.TZDateTime.now(tz.local).add(const Duration(days: 1)),
-      platformChannelSpecifics,
-      androidAllowWhileIdle: true,
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time,
-    );
+  await _flutterLocalNotificationsPlugin.zonedSchedule(
+    1,
+    'Daily Logging',
+    'Don\'t forget to log your symptoms and mood today!',
+    tz.TZDateTime.now(tz.local).add(const Duration(days: 1)),
+    platformChannelSpecifics,
+    uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+    matchDateTimeComponents: DateTimeComponents.time,
+    androidScheduleMode: AndroidScheduleMode.exact,  // Add this line
+  );
 
     // Store the notification if _databaseService and _userProvider are not null
     if (_databaseService != null && _userProvider != null) {
@@ -85,27 +85,27 @@ class NotificationService {
     }
   }
 
-  Future<void> scheduleTemperatureReminder() async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
-      'temperature_channel',
-      'Temperature Tracking',
-      channelDescription: 'Remind you to track your temperature',
-      importance: Importance.defaultImportance,
-      priority: Priority.defaultPriority,
-    );
-    const NotificationDetails platformChannelSpecifics = NotificationDetails(android: androidPlatformChannelSpecifics);
+Future<void> scheduleTemperatureReminder() async {
+  const AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
+    'temperature_channel',
+    'Temperature Tracking',
+    channelDescription: 'Remind you to track your temperature',
+    importance: Importance.defaultImportance,
+    priority: Priority.defaultPriority,
+  );
+  const NotificationDetails platformChannelSpecifics = NotificationDetails(android: androidPlatformChannelSpecifics);
 
-    // Schedule for 7 AM every day, assuming basal temperature is taken in the morning
-    await _flutterLocalNotificationsPlugin.zonedSchedule(
-      2,
-      'Temperature Reminder',
-      'Time to log your basal body temperature!',
-      tz.TZDateTime(tz.local, DateTime.now().year, DateTime.now().month, DateTime.now().day, 7, 0),
-      platformChannelSpecifics,
-      androidAllowWhileIdle: true,
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time,
-    );
+  // Schedule for 7 AM every day, assuming basal temperature is taken in the morning
+  await _flutterLocalNotificationsPlugin.zonedSchedule(
+    2,
+    'Temperature Reminder',
+    'Time to log your basal body temperature!',
+    tz.TZDateTime(tz.local, DateTime.now().year, DateTime.now().month, DateTime.now().day, 7, 0),
+    platformChannelSpecifics,
+    uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+    matchDateTimeComponents: DateTimeComponents.time,
+    androidScheduleMode: AndroidScheduleMode.exact,  // Add this line
+  );
 
     // Store the notification if _databaseService and _userProvider are not null
     if (_databaseService != null && _userProvider != null) {

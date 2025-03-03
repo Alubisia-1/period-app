@@ -1,4 +1,6 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.period_tracker_app"
+>
     <application
         android:label="period_tracker_app"
         android:name="${applicationName}"
