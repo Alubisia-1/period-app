@@ -13,6 +13,8 @@ import '../models/user.dart';
 import 'package:period_tracker_app/providers/user_provider.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:logging/logging.dart';
+import 'package:permission_handler/permission_handler.dart';
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -25,6 +27,7 @@ class HomeScreen extends StatefulWidget {
 class HomeScreenState extends State<HomeScreen> {
   final BackupService backupService = BackupService();
   final _logger = Logger('HomeScreen');
+ BluetoothPrint bluetoothPrint = BluetoothPrint.instance;
   
   // Define color scheme for consistency
   static const Color primaryColor = Color(0xFFE91E63); // Pink color
@@ -403,24 +406,57 @@ Widget _buildTemperatureLogButton(BuildContext context) => Container(
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text('Connect Printer'),
+          title: Text('Connect Bluetooth device'),
           content: Text('Ensure your Bluetooth printer is paired via your device\'s Bluetooth settings.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: Text('Cancel'),
             ),
-            ElevatedButton(
-              onPressed: () => _connectToThermometer(context),
-              child: Text('Proceed'),
-            ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context); // Close dialog before proceeding
+              await _requestBluetoothPermissionsAndConnect(context);
+            },
+            child: Text('Proceed'),
+          ),
           ],
         ),
       );
     }
-  void _connectToThermometer(BuildContext context) async {
-    BluetoothPrint bluetoothPrint = BluetoothPrint.instance;
-    String deviceAddress = "00:11:22:33:44:55"; // Your printer's address (optional)
+      Future<void> _requestBluetoothPermissionsAndConnect(BuildContext context) async {
+    // Define required permissions based on Android version
+    List<Permission> permissions = [
+      Permission.bluetooth,
+      Permission.bluetoothScan,
+      Permission.bluetoothConnect,
+    ];
+
+    // Request permissions
+    Map<Permission, PermissionStatus> statuses = await permissions.request();
+
+    if (statuses[Permission.bluetooth]!.isDenied ||
+        statuses[Permission.bluetoothScan]!.isDenied ||
+        statuses[Permission.bluetoothConnect]!.isDenied) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Bluetooth permissions are required to connect to the printer.'),
+            action: SnackBarAction(
+              label: 'Settings',
+              onPressed: () => openAppSettings(), // Open app settings if denied
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    // Permissions granted, proceed to connect
+    await _connectToThermometer(context);
+  }
+ Future<void> _connectToThermometer(BuildContext context) async {
+    String deviceAddress = "00:11:22:33:44:55"; // Replace with actual address or make configurable
 
     try {
       bool isConnected = await bluetoothPrint.isConnected ?? false;
@@ -436,12 +472,15 @@ Widget _buildTemperatureLogButton(BuildContext context) => Container(
           }
           return;
         }
+
         BluetoothDevice? targetDevice = devices.firstWhere(
           (device) => device.address == deviceAddress,
-          orElse: () => devices.first, // Fallback to first device if address not found
+          orElse: () => devices.first, // Fallback to first device
         );
+        _logger.info('Connecting to device: ${targetDevice.name} (${targetDevice.address})');
         await bluetoothPrint.connect(targetDevice);
       }
+
       if (await bluetoothPrint.isConnected == true) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -457,13 +496,14 @@ Widget _buildTemperatureLogButton(BuildContext context) => Container(
         throw Exception('Connection failed');
       }
     } catch (e) {
+      _logger.warning('Failed to connect to printer: $e');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to connect to printer: $e')),
         );
       }
     } finally {
-      await bluetoothPrint.stopScan(); // Clean up
+      await bluetoothPrint.stopScan();
     }
   }
 

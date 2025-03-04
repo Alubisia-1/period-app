@@ -14,6 +14,7 @@ import 'package:pointycastle/macs/hmac.dart' as pointycastle;
 import 'package:flutter_bcrypt/flutter_bcrypt.dart';
 
 class DatabaseService {
+  static final String chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#\$%^&*';
   static final DatabaseService _instance = DatabaseService._internal();
   factory DatabaseService() => _instance;
   final _storage = FlutterSecureStorage();
@@ -26,10 +27,17 @@ class DatabaseService {
   /// Singleton pattern to ensure only one instance of DatabaseService is created.
   static Future<DatabaseService> getInstance() async {
     if (_instance._database == null) {
-      // Only initialize if it hasn't been done yet
-      await _instance._initDB();
+      // Offload initialization to an isolate
+      await compute(_initDBIsolate, null);
     }
     return _instance;
+  }
+
+  // Static method for isolate
+  static Future<Database> _initDBIsolate(dynamic _) async {
+    final instance = DatabaseService._internal();
+    instance._database = await instance._initDB();
+    return instance._database!;
   }
 
   /// Getter for the database instance, initializes if not already done.
@@ -46,21 +54,18 @@ class DatabaseService {
 
   /// Initializes the database by creating it if it doesn't exist and setting up the schema.
   Future<Database> _initDB() async {
-    String? password = await _storage.read(key: 'user_password'); // Assume this is the login password
-    if (password == null) {
-      _logger.severe('No password set for user');
-      throw Exception('No password set for user');
+    String? password = await _storage.read(key: 'user_password');
+     // If no password is set, generate a secure default password
+    if (password == null || password.isEmpty) {
+      _logger.info('No password set. Generating a secure default password.');
+      password = _generateSecurePassword(); // Generate a secure random password
+      await _storage.write(key: 'user_password', value: password); // Store it securely
     }
 
     // PBKDF2 Key Derivation
     final random = Random.secure();
     final salt = Uint8List.fromList(List<int>.generate(16, (_) => random.nextInt(256)));
-   /*
-    final saltString = base64Encode(salt);
-    // Higher number for production to slow down key derivation
-    
-    */
-    final iterations = 100000; // Higher number for production to slow down key derivation
+    final iterations = 10000; // Higher number for production to slow down key derivation
     final keyLength = 32; // 32 bytes = 256 bits for AES-256 in SQLCipher
 
     // Setup PBKDF2 with HMAC-SHA256
@@ -89,6 +94,17 @@ class DatabaseService {
       }
     }
     return _database!;
+  }
+
+  // Helper method to generate a secure random password
+  String _generateSecurePassword() {
+    final random = Random.secure();
+    return String.fromCharCodes(
+      Iterable.generate(
+        16, //Lengt of the password (adjust if necessary)
+        (_) => chars.codeUnitAt(random.nextInt(chars.length)),
+      ),
+    );
   }
 
   /// Creates all necessary tables for the application.

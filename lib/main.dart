@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/foundation.dart';
-import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:period_tracker_app/services/database_service.dart';
@@ -20,51 +17,35 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterL
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await MobileAds.instance.initialize();
-
+  // Minimal blocking initialization
   setupLogging();
-
-  if (kIsWeb) {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfiWeb;
-  } else {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  }
-
   tz.initializeTimeZones();
 
-  // Use '@mipmap/ic_launcher' to reference the icon in the mipmap folder
+  // Non-blocking initializations (fire and forget)
+  MobileAds.instance.initialize(); // Runs in background
   const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
-  final InitializationSettings initializationSettings = InitializationSettings(
-    android: initializationSettingsAndroid,
-  );
-  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+  final InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
+  flutterLocalNotificationsPlugin.initialize(initializationSettings); // Runs in background
 
-  DatabaseService? databaseService;
-  SharedPreferencesService? sharedPreferencesService;
-
-  if (kIsWeb) {
-    sharedPreferencesService = await SharedPreferencesService.getInstance();
-    // For web, we'll initialize the database service, but it will use in-memory database
-    databaseService = DatabaseService();
-  } else {
-    databaseService = await DatabaseService.getInstance();
-  }
-
-  final userProvider = UserProvider(); // Create UserProvider instance
-
-  // Create NotificationService instance
-  final NotificationService notificationService = NotificationService(flutterLocalNotificationsPlugin, databaseService, userProvider);
-
+  // Start app immediately, initialize services lazily
   runApp(
     MultiProvider(
       providers: [
-        Provider<DatabaseService?>(create: (_) => databaseService),
-        Provider<SharedPreferencesService?>(create: (_) => sharedPreferencesService),
+        FutureProvider<DatabaseService?>(
+          create: (_) => DatabaseService.getInstance(),
+          initialData: null, // Database will be null until ready
+        ),
+        FutureProvider<SharedPreferencesService?>(
+          create: (_) => SharedPreferencesService.getInstance(),
+          initialData: null,
+        ),
         Provider<FlutterLocalNotificationsPlugin>(create: (_) => flutterLocalNotificationsPlugin),
-        Provider<NotificationService>(create: (_) => notificationService),
-        ChangeNotifierProvider(create: (_) => userProvider),
+        Provider(create: (context) => NotificationService(
+          flutterLocalNotificationsPlugin,
+          context.read<DatabaseService?>(), // Will be null initially
+          UserProvider(),
+        )),
+        ChangeNotifierProvider(create: (_) => UserProvider()),
       ],
       child: MyApp(),
     ),
