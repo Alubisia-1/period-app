@@ -677,31 +677,44 @@ void _login(String fullName, String password) async {
   final userProvider = Provider.of<UserProvider>(context, listen: false);
 
   try {
-    final db = await dbService.database;
-    List<Map<String, dynamic>> result = await db.query(
+    // Await the database Future to get the Database object, then call query
+    final db = await dbService.database; // Resolve the Future<Database>
+    final users = await db.query(
       'users',
-      where: 'name = ? AND password = ?',
-      whereArgs: [fullName, password],
+      where: 'name = ?',
+      whereArgs: [fullName],
     );
 
-    if (result.isNotEmpty) {
-      User user = User(
-        id: result[0]['id'],
-        password: result[0]['password'],
-        fullName: result[0]['name'],
-      );
+    if (users.isNotEmpty) {
+      final userId = users.first['id'] as int?; // Use int? to match the updated User model
+      if (userId != null) {
+        // Use verifyUserPassword to securely verify the password
+        bool isPasswordValid = await dbService.verifyUserPassword(userId.toString(), password);
+        if (isPasswordValid) {
+          User user = User(
+            id: userId, // Use the int ID directly
+            fullName: fullName,
+          );
 
-      userProvider.login(user);  // Update the UserProvider with the logged-in user
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login successful! Welcome, ${user.fullName}')),
-        );
-        Navigator.of(context).pop(); // Close dialog
+          userProvider.login(user); // Update the UserProvider with the logged-in user
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Login successful! Welcome, ${user.fullName}')),
+            );
+            Navigator.of(context).pop(); // Close dialog
+          }
+        } else {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Login failed. Incorrect name or password.')),
+            );
+          }
+        }
       }
     } else {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login failed. Incorrect name or password.')),
+          SnackBar(content: Text('Login failed. User not found.')),
         );
       }
     }
@@ -713,14 +726,13 @@ void _login(String fullName, String password) async {
     }
   }
 }
-
 void _register(String password, String fullName) async {
   final dbService = DatabaseService();
   final userProvider = Provider.of<UserProvider>(context, listen: false);
 
   try {
     final db = await dbService.database;
-    List<Map<String, dynamic>> existingUsers = await db.query('users');
+    List<Map<String, dynamic>> existingUsers = await db.query('users', where: 'name = ?', whereArgs: [fullName]);
 
     if (existingUsers.isEmpty) {
       await dbService.insertUser({
@@ -730,20 +742,25 @@ void _register(String password, String fullName) async {
         'cycle_average': 28,
       });
 
-      // Create a User object with the new user's data
-      User newUser = User(
-        id: existingUsers.length + 1, // Assuming auto-increment, adjust if needed
-        password: password,
-        fullName: fullName,
-      );
+      // Query the newly inserted user to get the ID
+      final newUsers = await db.query('users', where: 'name = ?', whereArgs: [fullName]);
+      if (newUsers.isNotEmpty) {
+        final userId = newUsers.first['id'] as int?;
+        if (userId != null) {
+          User newUser = User(
+            id: userId,
+            fullName: fullName,
+          );
 
-      userProvider.login(newUser); // Log the new user in immediately after registration
+          userProvider.login(newUser); // Log the new user in immediately after registration
 
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Registration successful! You can now log in.')),
-        );
-        Navigator.of(context).pop(); // Close dialog
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Registration successful! You can now log in.')),
+            );
+            Navigator.of(context).pop(); // Close dialog
+          }
+        }
       }
     } else {
       if (context.mounted) {
