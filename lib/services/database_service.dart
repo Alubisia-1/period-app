@@ -27,17 +27,9 @@ class DatabaseService {
   /// Singleton pattern to ensure only one instance of DatabaseService is created.
   static Future<DatabaseService> getInstance() async {
     if (_instance._database == null) {
-      // Offload initialization to an isolate
-      await compute(_initDBIsolate, null);
+      await _instance._initDB();
     }
     return _instance;
-  }
-
-  // Static method for isolate
-  static Future<Database> _initDBIsolate(dynamic _) async {
-    final instance = DatabaseService._internal();
-    instance._database = await instance._initDB();
-    return instance._database!;
   }
 
   /// Getter for the database instance, initializes if not already done.
@@ -55,18 +47,29 @@ class DatabaseService {
   /// Initializes the database by creating it if it doesn't exist and setting up the schema.
   Future<Database> _initDB() async {
     String? password = await _storage.read(key: 'user_password');
+    String? storedSalt = await _storage.read(key: 'db_salt');
+
     // If no password is set, generate a secure default password
     if (password == null || password.isEmpty) {
       _logger.info('No password set. Generating a secure default password.');
-      password = _generateSecurePassword(); // Generate a secure random password
-      await _storage.write(key: 'user_password', value: password); // Store it securely
+      password = _generateSecurePassword();
+      await _storage.write(key: 'user_password', value: password);
     }
 
     // PBKDF2 Key Derivation
     final random = Random.secure();
-    final salt = Uint8List.fromList(List<int>.generate(16, (_) => random.nextInt(256)));
-    final iterations = 10000; // Higher number for production to slow down key derivation
-    final keyLength = 32; // 32 bytes = 256 bits for AES-256 in SQLCipher
+    final Uint8List salt;
+    if (storedSalt == null) {
+      // Generate a new salt if none exists
+      salt = Uint8List.fromList(List<int>.generate(16, (_) => random.nextInt(256)));
+      await _storage.write(key: 'db_salt', value: base64.encode(salt)); // Persist the salt
+    } else {
+      // Use the stored salt
+      salt = base64.decode(storedSalt);
+    }
+
+    const iterations = 10000; // Higher number for production
+    const keyLength = 32; // 256 bits for AES-256 in SQLCipher
 
     // Setup PBKDF2 with HMAC-SHA256
     final pbkdf2 = pointycastle.PBKDF2KeyDerivator(pointycastle.HMac(pointycastle.SHA256Digest(), 64));
@@ -78,20 +81,21 @@ class DatabaseService {
     if (kIsWeb) {
       _logger.severe('Encryption not supported on web');
       throw Exception('Encryption not supported on web');
-    } else {
-      String path = p.join(await sqflite.getDatabasesPath(), 'period_tracker_encrypted.db');      
-      try {
-        _database = await sqlcipher.openDatabase(
-          path,
-          version: 2,
-          onCreate: _createTables,
-          onUpgrade: _onUpgrade,
-          password: encryptionKey, // Use the derived key
-        );
-      } catch (e, stackTrace) {
-        _logger.severe('Error initializing database', e, stackTrace);
-        throw Exception('Failed to initialize database: $e');
-      }
+    }
+
+    String path = p.join(await sqflite.getDatabasesPath(), 'period_tracker_encrypted.db');
+    try {
+      _database = await sqlcipher.openDatabase(
+        path,
+        version: 2,
+        onCreate: _createTables,
+        onUpgrade: _onUpgrade,
+        password: encryptionKey,
+      );
+      _logger.info('Database initialized successfully at $path');
+    } catch (e, stackTrace) {
+      _logger.severe('Error initializing database', e, stackTrace);
+      throw Exception('Failed to initialize database: $e');
     }
     return _database!;
   }
@@ -101,7 +105,7 @@ class DatabaseService {
     final random = Random.secure();
     return String.fromCharCodes(
       Iterable.generate(
-        16, // Length of the password (adjust if necessary)
+        16,
         (_) => chars.codeUnitAt(random.nextInt(chars.length)),
       ),
     );
@@ -133,39 +137,38 @@ class DatabaseService {
   }
 
   /// Handles database upgrades.
-void _onUpgrade(Database db, int oldVersion, int newVersion) async {
-  if (oldVersion < 2) {
-    try {
-      await db.execute("ALTER TABLE users ADD COLUMN password_hash TEXT");
-      await db.execute("ALTER TABLE users ADD COLUMN salt TEXT"); // Add this line to include salt
-    } catch (e, stackTrace) {
-      _logger.warning('Error upgrading database from $oldVersion to $newVersion', e, stackTrace);
+  void _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      try {
+        await db.execute("ALTER TABLE users ADD COLUMN password_hash TEXT");
+        await db.execute("ALTER TABLE users ADD COLUMN salt TEXT");
+      } catch (e, stackTrace) {
+        _logger.warning('Error upgrading database from $oldVersion to $newVersion', e, stackTrace);
+      }
+    }
+    if (oldVersion < 3) {
+      try {
+        await db.execute("ALTER TABLE cycles ADD COLUMN flow_level TEXT");
+        _logger.info('Added flow_level column to cycles table');
+      } catch (e, stackTrace) {
+        _logger.warning('Error upgrading cycles table to add flow_level column', e, stackTrace);
+      }
     }
   }
-  // Add this block for version 3 (or adjust the version number)
-  if (oldVersion < 3) {
-    try {
-      await db.execute("ALTER TABLE cycles ADD COLUMN flow_level TEXT");
-      _logger.info('Added flow_level column to cycles table');
-    } catch (e, stackTrace) {
-      _logger.warning('Error upgrading cycles table to add flow_level column', e, stackTrace);
-    }
-  }
-}
 
   /// Inserts a cycle into the cycles table. Uses REPLACE conflict algorithm to handle duplicates.
-Future<void> insertCycle(Map<String, dynamic> cycle) async {
-  final db = await database;
-  _logger.info('Inserting cycle with data: $cycle');
-  await db.transaction((txn) async {
-    try {
-      await txn.insert('cycles', cycle, conflictAlgorithm: ConflictAlgorithm.replace);
-    } catch (e, stackTrace) {
-      _logger.warning('Error inserting cycle within transaction', e, stackTrace);
-      throw Exception('Failed to insert cycle: $e');
-    }
-  });
-}
+  Future<void> insertCycle(Map<String, dynamic> cycle) async {
+    final db = await database;
+    _logger.info('Inserting cycle with data: $cycle');
+    await db.transaction((txn) async {
+      try {
+        await txn.insert('cycles', cycle, conflictAlgorithm: ConflictAlgorithm.replace);
+      } catch (e, stackTrace) {
+        _logger.warning('Error inserting cycle within transaction', e, stackTrace);
+        throw Exception('Failed to insert cycle: $e');
+      }
+    });
+  }
 
   Future<void> insertDailyLog(Map<String, Object?> log) async {
     final db = await database;
@@ -182,7 +185,6 @@ Future<void> insertCycle(Map<String, dynamic> cycle) async {
     final db = await database;
     await db.transaction((txn) async {
       try {
-        // First, check if there's an existing entry for the date
         var existingLog = await txn.query(
           'daily_logs',
           where: 'date = ? AND user_id = ?',
@@ -190,7 +192,6 @@ Future<void> insertCycle(Map<String, dynamic> cycle) async {
         );
 
         if (existingLog.isNotEmpty) {
-          // Update the existing log
           await txn.update(
             'daily_logs',
             log,
@@ -198,7 +199,6 @@ Future<void> insertCycle(Map<String, dynamic> cycle) async {
             whereArgs: [log['date'], log['user_id']],
           );
         } else {
-          // Insert a new log if none exists
           await txn.insert('daily_logs', log, conflictAlgorithm: ConflictAlgorithm.replace);
         }
       } catch (e, stackTrace) {
@@ -210,14 +210,12 @@ Future<void> insertCycle(Map<String, dynamic> cycle) async {
 
   /// Inserts a user into the users table. Uses REPLACE conflict algorithm to handle duplicates.
   Future<void> insertUser(Map<String, dynamic> userData) async {
-    // Use FlutterBcrypt.salt() to generate a bcrypt-compatible salt
-    final salt = await FlutterBcrypt.salt(); // Generates a bcrypt-compatible salt (e.g., "$2a$10$...")
+    final salt = await FlutterBcrypt.salt();
     final hashedPassword = await FlutterBcrypt.hashPw(password: userData['password'], salt: salt);
     
-    // Store the hashed password and salt
     userData['password_hash'] = hashedPassword;
-    userData['salt'] = salt; // Store the raw bcrypt salt string (e.g., "$2a$10$...")
-    userData.remove('password'); // Remove the plain text password
+    userData['salt'] = salt;
+    userData.remove('password');
     
     final db = await database;
     try {
