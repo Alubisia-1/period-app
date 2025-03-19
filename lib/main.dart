@@ -21,33 +21,43 @@ void main() async {
   setupLogging();
   tz.initializeTimeZones();
 
-  // Non-blocking initializations (fire and forget)
+  // Non-blocking initializations with minimal waiting
   MobileAds.instance.initialize(); // Runs in background
   const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
   final InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
-  flutterLocalNotificationsPlugin.initialize(initializationSettings); // Runs in background
+  await flutterLocalNotificationsPlugin.initialize(initializationSettings); // Await for reliability
 
   // Start app immediately, initialize services lazily
   runApp(
     MultiProvider(
       providers: [
         FutureProvider<DatabaseService?>(
-          create: (_) => DatabaseService.getInstance(),
+          create: (_) async {
+            final dbService = await DatabaseService.getInstance();
+            debugPrint('DatabaseService initialized');
+            return dbService;
+          },
           initialData: null, // Database will be null until ready
         ),
         FutureProvider<SharedPreferencesService?>(
-          create: (_) => SharedPreferencesService.getInstance(),
+          create: (_) async {
+            final prefs = await SharedPreferencesService.getInstance();
+            debugPrint('SharedPreferencesService initialized');
+            return prefs;
+          },
           initialData: null,
         ),
         Provider<FlutterLocalNotificationsPlugin>(create: (_) => flutterLocalNotificationsPlugin),
-        Provider(create: (context) => NotificationService(
-          flutterLocalNotificationsPlugin,
-          context.read<DatabaseService?>(), // Will be null initially
-          UserProvider(),
-        )),
+        Provider(
+          create: (context) => NotificationService(
+            flutterLocalNotificationsPlugin,
+            context.read<DatabaseService?>(), // Will be null initially
+            UserProvider(),
+          ),
+        ),
         ChangeNotifierProvider(create: (_) => UserProvider()),
       ],
-      child: MyApp(),
+      child: const MyApp(), // Kept const since MyApp is stateless and constant
     ),
   );
 }
@@ -63,10 +73,10 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.pink,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: HomeScreen(),
+      home: const HomeScreen(), // Kept const if HomeScreen supports it
       routes: {
-        '/period_tracking': (context) => PeriodTrackingScreen(),
-        '/full_log': (context) => TrackSymptomMoodScreen(),
+        '/period_tracking': (context) => const PeriodTrackingScreen(), // Added const to match widget declaration
+        '/full_log': (context) => const TrackSymptomMoodScreen(), // Added const if TrackSymptomMoodScreen supports it
       },
     );
   }
